@@ -12,7 +12,7 @@ pub mod stack;
 
 pub mod compiler;
 
-pub(crate) mod treepp {
+pub mod treepp {
     pub use bitcoin_script::{define_pushable, script};
     #[cfg(test)]
     pub use bitcoin_scriptexec::execute_script;
