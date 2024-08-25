@@ -112,7 +112,9 @@ impl Compiler {
                         ref_positions.push(stack.get_relative_position(input_idx)?);
                     }
 
-                    script.extend_from_slice((function_metadata.script)(&ref_positions).as_bytes());
+                    script.extend_from_slice(
+                        (function_metadata.script_generator)(&ref_positions).as_bytes(),
+                    );
 
                     // push the corresponding outputs
                     for output_type in function_metadata.output.iter() {

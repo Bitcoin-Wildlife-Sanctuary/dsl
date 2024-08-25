@@ -37,8 +37,8 @@ mod test {
         dsl.add_function(
             "m31_mult",
             FunctionMetadata {
-                ptr: m31_mult,
-                script: m31_mult_gadget,
+                trace_generator: m31_mult,
+                script_generator: m31_mult_gadget,
                 input: vec!["m31", "m31"],
                 output: vec!["m31"],
             },

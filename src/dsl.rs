@@ -204,7 +204,7 @@ impl DSL {
 
         let output_types = function_metadata.output.clone();
 
-        let exec_result = (function_metadata.ptr)(self, &input_idxs);
+        let exec_result = (function_metadata.trace_generator)(self, &input_idxs);
 
         assert_eq!(exec_result.new_elements.len(), output_types.len());
 
