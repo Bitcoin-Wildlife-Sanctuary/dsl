@@ -1,5 +1,6 @@
 use crate::dsl::{MemoryEntry, DSL};
 use crate::treepp::Script;
+use anyhow::Result;
 use std::collections::HashMap;
 
 pub struct FunctionRegistry {
@@ -15,8 +16,8 @@ impl FunctionRegistry {
 }
 
 pub struct FunctionMetadata {
-    pub trace_generator: fn(&mut DSL, &[usize]) -> Option<FunctionOutput>,
-    pub script_generator: fn(&[usize]) -> Script,
+    pub trace_generator: fn(&mut DSL, &[usize]) -> Result<FunctionOutput>,
+    pub script_generator: fn(&[usize]) -> Result<Script>,
     pub input: Vec<&'static str>,
     pub output: Vec<&'static str>,
 }

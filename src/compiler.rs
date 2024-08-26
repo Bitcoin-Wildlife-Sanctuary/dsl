@@ -72,7 +72,7 @@ impl Compiler {
                             deferred_ref.push(input_idx);
                             // do not obtain the location of the ref-only element before we clone other inputs.
                         } else {
-                            let len = input_metadata.num_elements;
+                            let len = input_metadata.element_type.len();
                             let pos = stack.get_relative_position(input_idx)?;
 
                             if last_visit[input_idx] == cur_time {
@@ -113,18 +113,18 @@ impl Compiler {
                     }
 
                     script.extend_from_slice(
-                        (function_metadata.script_generator)(&ref_positions).as_bytes(),
+                        (function_metadata.script_generator)(&ref_positions)?.as_bytes(),
                     );
 
                     // push the corresponding outputs
                     for output_type in function_metadata.output.iter() {
-                        let num_elements = dsl
+                        let data_type_metadata = dsl
                             .data_type_registry
                             .map
                             .get(&output_type.to_string())
-                            .unwrap()
-                            .num_elements;
-                        stack.push_to_stack(allocated_idx, num_elements)?;
+                            .unwrap();
+                        stack
+                            .push_to_stack(allocated_idx, data_type_metadata.element_type.len())?;
                         allocated_idx += 1;
                     }
 
@@ -137,7 +137,7 @@ impl Compiler {
                         .map
                         .get(&data_type.to_string())
                         .unwrap();
-                    stack.push_to_stack(*idx, input_metadata.num_elements)?;
+                    stack.push_to_stack(*idx, input_metadata.element_type.len())?;
                     allocated_idx += 1;
 
                     script.extend_from_slice(

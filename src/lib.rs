@@ -1,8 +1,9 @@
-use bitcoin_script::script;
-use bitcoin_scriptexec::execute_script;
 use crate::compiler::Compiler;
 use crate::dsl::DSL;
 use crate::treepp::Script;
+use anyhow::{Error, Result};
+use bitcoin_script::script;
+use bitcoin_scriptexec::execute_script;
 
 pub mod data_type;
 
@@ -29,8 +30,8 @@ pub(crate) mod treepp {
 
 use crate::treepp::*;
 
-pub fn test_program(dsl: DSL) {
-    let program = Compiler::compiler(dsl).unwrap();
+pub fn test_program(dsl: DSL) -> Result<()> {
+    let program = Compiler::compiler(dsl)?;
 
     let mut script = script! {
         for elem in program.hint.iter() {
@@ -39,11 +40,16 @@ pub fn test_program(dsl: DSL) {
         for elem in program.input.iter() {
             { elem }
         }
-    }.to_bytes();
+    }
+    .to_bytes();
     script.extend_from_slice(program.script.as_bytes());
 
     let script = Script::from_bytes(script);
 
     let exec_result = execute_script(script);
-    assert!(exec_result.success);
+    if exec_result.success {
+        Ok(())
+    } else {
+        Err(Error::msg("Script execution is not successful"))
+    }
 }

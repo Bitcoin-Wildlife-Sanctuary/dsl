@@ -1,3 +1,4 @@
+use crate::dsl::ElementType;
 use std::collections::HashMap;
 
 pub struct DataTypeRegistry {
@@ -13,6 +14,6 @@ impl DataTypeRegistry {
 }
 
 pub struct DataTypeMetadata {
-    pub num_elements: usize,
+    pub element_type: ElementType,
     pub ref_only: bool,
 }
