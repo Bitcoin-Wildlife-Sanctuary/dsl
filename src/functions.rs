@@ -15,7 +15,7 @@ impl FunctionRegistry {
 }
 
 pub struct FunctionMetadata {
-    pub trace_generator: fn(&mut DSL, &[usize]) -> FunctionOutput,
+    pub trace_generator: fn(&mut DSL, &[usize]) -> Option<FunctionOutput>,
     pub script_generator: fn(&[usize]) -> Script,
     pub input: Vec<&'static str>,
     pub output: Vec<&'static str>,

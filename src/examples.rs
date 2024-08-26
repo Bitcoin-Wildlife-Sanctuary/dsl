@@ -8,16 +8,16 @@ mod test {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
-    fn m31_mult(dsl: &mut DSL, inputs: &[usize]) -> FunctionOutput {
+    fn m31_mult(dsl: &mut DSL, inputs: &[usize]) -> Option<FunctionOutput> {
         let a = dsl.get_num(inputs[0]);
         let b = dsl.get_num(inputs[1]);
 
         let res = (a as i64) * (b as i64) % ((1i64 << 31) - 1);
 
-        FunctionOutput {
+        Some(FunctionOutput {
             new_elements: vec![MemoryEntry::new("m31", Element::Num(res as i32))],
             new_hints: vec![],
-        }
+        })
     }
 
     fn m31_mult_gadget(_: &[usize]) -> ScriptBuf {
