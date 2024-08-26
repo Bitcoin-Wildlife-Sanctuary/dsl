@@ -174,6 +174,39 @@ impl DSL {
         }
     }
 
+    pub fn get_many_num(&mut self, idx: usize) -> &[i32] {
+        match &self.memory.get(&idx).unwrap().data {
+            Element::ManyNum(v) => {
+                v.as_slice()
+            }
+            _ => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn get_str(&mut self, idx: usize) -> &[u8] {
+        match &self.memory.get(&idx).unwrap().data {
+            Element::Str(v) => {
+                v.as_slice()
+            }
+            _ =>  {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn get_many_str(&mut self, idx: usize) -> &[Vec<u8>] {
+        match &self.memory.get(&idx).unwrap().data {
+            Element::ManyStr(v) => {
+                v.as_slice()
+            }
+            _ => {
+                unimplemented!()
+            }
+        }
+    }
+
     pub fn set_name(&mut self, idx: usize, name: impl ToString) {
         self.memory.get_mut(&idx).unwrap().description = Some(name.to_string());
     }
