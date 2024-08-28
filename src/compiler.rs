@@ -62,13 +62,20 @@ impl Compiler {
                     for (&input_idx, input_type) in
                         inputs.iter().zip(function_metadata.input.iter())
                     {
-                        let input_metadata = dsl
-                            .data_type_registry
-                            .map
-                            .get(&input_type.to_string())
-                            .unwrap();
+                        let input_type_name = if input_type.starts_with("&") {
+                            input_type.split_at(1).1
+                        } else {
+                            input_type
+                        };
 
-                        if input_metadata.ref_only {
+                        let input_metadata =
+                            dsl
+                                .data_type_registry
+                                .map
+                                .get(&input_type_name.to_string())
+                                .unwrap();
+
+                        if input_type.starts_with("&") {
                             deferred_ref.push(input_idx);
                             // do not obtain the location of the ref-only element before we clone other inputs.
                         } else {

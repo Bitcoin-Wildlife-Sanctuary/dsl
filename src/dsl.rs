@@ -141,17 +141,6 @@ impl DSL {
             name.to_string(),
             DataTypeMetadata {
                 element_type,
-                ref_only: false,
-            },
-        );
-    }
-
-    pub fn add_ref_only_data_type(&mut self, name: impl ToString, element_type: ElementType) {
-        self.data_type_registry.map.insert(
-            name.to_string(),
-            DataTypeMetadata {
-                element_type,
-                ref_only: true,
             },
         );
     }
@@ -297,7 +286,7 @@ impl DSL {
 
         for (input_idx, &input_type) in input_idxs.iter().zip(function_metadata.input.iter()) {
             let stack_entry = self.memory.get_mut(input_idx).unwrap();
-            if stack_entry.data_type != input_type {
+            if stack_entry.data_type != input_type && stack_entry.data_type != format!("&{}", input_type) {
                 return Err(Error::msg("The input data type mismatches"));
             }
         }

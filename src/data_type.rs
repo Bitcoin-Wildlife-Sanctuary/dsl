@@ -15,5 +15,4 @@ impl DataTypeRegistry {
 
 pub struct DataTypeMetadata {
     pub element_type: ElementType,
-    pub ref_only: bool,
 }
