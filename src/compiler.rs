@@ -68,12 +68,11 @@ impl Compiler {
                             input_type
                         };
 
-                        let input_metadata =
-                            dsl
-                                .data_type_registry
-                                .map
-                                .get(&input_type_name.to_string())
-                                .unwrap();
+                        let input_metadata = dsl
+                            .data_type_registry
+                            .map
+                            .get(&input_type_name.to_string())
+                            .unwrap();
 
                         if input_type.starts_with("&") {
                             deferred_ref.push(input_idx);

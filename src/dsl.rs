@@ -137,12 +137,9 @@ impl DSL {
     }
 
     pub fn add_data_type(&mut self, name: impl ToString, element_type: ElementType) {
-        self.data_type_registry.map.insert(
-            name.to_string(),
-            DataTypeMetadata {
-                element_type,
-            },
-        );
+        self.data_type_registry
+            .map
+            .insert(name.to_string(), DataTypeMetadata { element_type });
     }
 
     pub fn add_function(&mut self, name: impl ToString, meta: FunctionMetadata) {
@@ -286,7 +283,9 @@ impl DSL {
 
         for (input_idx, &input_type) in input_idxs.iter().zip(function_metadata.input.iter()) {
             let stack_entry = self.memory.get_mut(input_idx).unwrap();
-            if stack_entry.data_type != input_type && stack_entry.data_type != format!("&{}", input_type) {
+            if stack_entry.data_type != input_type
+                && input_type != format!("&{}", stack_entry.data_type)
+            {
                 return Err(Error::msg("The input data type mismatches"));
             }
         }
