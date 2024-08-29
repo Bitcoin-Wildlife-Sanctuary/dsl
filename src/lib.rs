@@ -49,6 +49,9 @@ pub fn test_program(dsl: DSL) -> Result<()> {
     println!("script size: {}", script.len());
 
     let exec_result = execute_script(script);
+
+    println!("max stack size: {}", exec_result.stats.max_nb_stack_items);
+
     if exec_result.success {
         Ok(())
     } else {
