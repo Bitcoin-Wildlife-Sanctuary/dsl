@@ -59,8 +59,8 @@ impl Compiler {
 
                     let mut deferred_ref = vec![];
                     let mut num_cloned_input_elements = 0;
-                    for (&input_idx, input_type) in
-                        inputs.iter().zip(function_metadata.input.iter())
+                    for (i, (&input_idx, input_type)) in
+                        inputs.iter().zip(function_metadata.input.iter()).enumerate()
                     {
                         let input_type_name = if input_type.starts_with("&") {
                             input_type.split_at(1).1
@@ -81,7 +81,7 @@ impl Compiler {
                             let len = input_metadata.element_type.len();
                             let pos = stack.get_relative_position(input_idx)?;
 
-                            if last_visit[input_idx] == cur_time {
+                            if last_visit[input_idx] == cur_time && !inputs[i..].contains(&input_idx) {
                                 // roll
                                 stack.pull(input_idx)?;
 
