@@ -46,6 +46,8 @@ pub fn test_program(dsl: DSL) -> Result<()> {
 
     let script = Script::from_bytes(script);
 
+    println!("script size: {}", script.len());
+
     let exec_result = execute_script(script);
     if exec_result.success {
         Ok(())
