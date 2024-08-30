@@ -190,8 +190,6 @@ impl Compiler {
                     }
                     .as_bytes(),
                 );
-
-                output_total_len += len;
             } else {
                 // roll
                 stack.pull(idx)?;
@@ -209,8 +207,6 @@ impl Compiler {
             }
             output_total_len += len;
         }
-
-        script.push(OP_RETURN.to_u8());
 
         // clear all the remaining elements
         let elements_in_stack = stack.get_num_elements_in_stack()?;
