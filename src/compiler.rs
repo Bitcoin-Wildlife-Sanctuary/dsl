@@ -3,6 +3,7 @@ use crate::script::CompiledProgram;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
+use bitcoin::opcodes::all::OP_RETURN;
 use bitcoin::opcodes::Ordinary::{OP_2DROP, OP_DROP, OP_FROMALTSTACK};
 use bitcoin::ScriptBuf;
 
@@ -208,6 +209,8 @@ impl Compiler {
             }
             output_total_len += len;
         }
+
+        script.push(OP_RETURN.to_u8());
 
         // clear all the remaining elements
         let elements_in_stack = stack.get_num_elements_in_stack()?;
