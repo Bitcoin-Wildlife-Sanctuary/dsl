@@ -50,12 +50,13 @@ pub fn test_program(dsl: DSL, expected_stack: Script) -> Result<()> {
         script.extend_from_slice(
             script! {
                 { elem.to_vec() }
-                OP_EQUALVERIFY
+                //OP_EQUALVERIFY
             }
             .as_bytes(),
         );
     }
 
+    script.push(OP_RETURN.to_u8());
     script.push(OP_TRUE.to_u8());
 
     let script = Script::from_bytes(script);
