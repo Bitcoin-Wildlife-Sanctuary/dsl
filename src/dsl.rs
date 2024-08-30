@@ -12,6 +12,7 @@ pub struct DSL {
     pub trace: Vec<TraceEntry>,
     pub num_inputs: Option<usize>,
     pub hint: Vec<MemoryEntry>,
+    pub output: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -133,6 +134,7 @@ impl DSL {
             trace: vec![],
             num_inputs: None,
             hint: vec![],
+            output: vec![],
         }
     }
 
@@ -190,6 +192,26 @@ impl DSL {
             ));
         }
         Self::alloc(self, data_type, data)
+    }
+
+    pub fn set_program_output(
+        &mut self,
+        expected_data_type: impl ToString,
+        idx: usize,
+    ) -> Result<()> {
+        match self.memory.get(&idx) {
+            Some(MemoryEntry { data_type, .. }) => {
+                if *data_type != expected_data_type.to_string() {
+                    Err(Error::msg("The program output data type does not match"))
+                } else {
+                    self.output.push(idx);
+                    Ok(())
+                }
+            }
+            _ => Err(Error::msg(
+                "Could not find the memory entry with the given index",
+            )),
+        }
     }
 
     pub fn get_num(&mut self, idx: usize) -> Result<i32> {

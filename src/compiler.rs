@@ -3,8 +3,7 @@ use crate::script::CompiledProgram;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
-use bitcoin::opcodes::Ordinary::{OP_2DROP, OP_DROP};
-use bitcoin::opcodes::OP_TRUE;
+use bitcoin::opcodes::Ordinary::{OP_2DROP, OP_DROP, OP_FROMALTSTACK};
 use bitcoin::ScriptBuf;
 
 pub struct Compiler;
@@ -59,8 +58,10 @@ impl Compiler {
 
                     let mut deferred_ref = vec![];
                     let mut num_cloned_input_elements = 0;
-                    for (i, (&input_idx, input_type)) in
-                        inputs.iter().zip(function_metadata.input.iter()).enumerate()
+                    for (i, (&input_idx, input_type)) in inputs
+                        .iter()
+                        .zip(function_metadata.input.iter())
+                        .enumerate()
                     {
                         let input_type_name = if input_type.starts_with("&") {
                             input_type.split_at(1).1
@@ -81,7 +82,10 @@ impl Compiler {
                             let len = input_metadata.element_type.len();
                             let pos = stack.get_relative_position(input_idx)?;
 
-                            if last_visit[input_idx] == cur_time && !inputs[i..].contains(&input_idx) {
+                            if last_visit[input_idx] == cur_time
+                                && !inputs[i..].contains(&input_idx)
+                                && !dsl.output.contains(&input_idx)
+                            {
                                 // roll
                                 stack.pull(input_idx)?;
 
@@ -156,7 +160,59 @@ impl Compiler {
             }
         }
 
-        // step 4: clear the entire stack
+        // step 4: move the desired output to the altstack
+        let mut output_list_rev = dsl.output.clone();
+        output_list_rev.reverse();
+
+        let mut output_total_len = 0;
+
+        for (i, &idx) in output_list_rev.iter().enumerate() {
+            // for each entry, roll or pick the data and then save the data to the altstack
+            // - roll, if this is the last occurrence of this idx in `output_list_rev`
+            // - pick, if this idx may occur another time in the remainder of `output_list_rev`
+            //
+            // the list is reversed with the mind that doing so may reduce the pull/roll distance and save the script length
+
+            if output_list_rev[i..].contains(&idx) {
+                // pick
+                let pos = stack.get_relative_position(idx)?;
+                let len = stack.get_length(idx)?;
+
+                script.extend_from_slice(
+                    script! {
+                        for _ in 0..len {
+                            { pos } OP_PICK
+                        }
+                        for _ in 0..len {
+                            OP_TOALTSTACK
+                        }
+                    }
+                    .as_bytes(),
+                );
+
+                output_total_len += len;
+            } else {
+                // roll
+                let pos = stack.get_relative_position(idx)?;
+                let len = stack.get_length(idx)?;
+
+                stack.pull(idx)?;
+
+                script.extend_from_slice(
+                    script! {
+                        for _ in 0..len {
+                            { pos } OP_ROLL
+                        }
+                        for _ in 0..len {
+                            OP_TOALTSTACK
+                        }
+                    }
+                    .as_bytes(),
+                );
+            }
+        }
+
+        // clear all the remaining elements
         let elements_in_stack = stack.get_num_elements_in_stack()?;
         for _ in 0..elements_in_stack / 2 {
             script.push(OP_2DROP.to_u8());
@@ -164,7 +220,11 @@ impl Compiler {
         if elements_in_stack % 2 == 1 {
             script.push(OP_DROP.to_u8());
         }
-        script.push(OP_TRUE.to_u8());
+
+        // recover the output from the altstack
+        for _ in 0..output_total_len {
+            script.push(OP_FROMALTSTACK.to_u8());
+        }
 
         Ok(CompiledProgram {
             input,

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test {
-    use crate::compiler::Compiler;
     use crate::dsl::{Element, ElementType, MemoryEntry, DSL};
     use crate::functions::{FunctionMetadata, FunctionOutput};
+    use crate::test_program;
     use crate::treepp::*;
     use anyhow::Result;
     use bitcoin::ScriptBuf;
@@ -47,7 +47,7 @@ mod test {
 
         let mut a = dsl.alloc_input("m31", Element::Num(a_val)).unwrap();
 
-        for _ in 0..1 {
+        for _ in 0..10 {
             let b_val = prng.gen_range(0..((1i64 << 31) - 1));
             let expected = (a_val as i64) * b_val % ((1i64 << 31) - 1);
 
@@ -64,22 +64,14 @@ mod test {
             a_val = res_val;
         }
 
-        let program = Compiler::compiler(dsl).unwrap();
+        dsl.set_program_output("m31", a).unwrap();
 
-        let mut script = script! {
-            for elem in program.hint.iter() {
-                { elem }
-            }
-            for elem in program.input.iter() {
-                { elem }
-            }
-        }
-        .to_bytes();
-        script.extend_from_slice(program.script.as_bytes());
-
-        let script = Script::from_bytes(script);
-
-        let exec_result = execute_script(script);
-        assert!(exec_result.success);
+        test_program(
+            dsl,
+            script! {
+                { a_val }
+            },
+        )
+        .unwrap();
     }
 }

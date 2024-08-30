@@ -2,8 +2,9 @@ use crate::compiler::Compiler;
 use crate::dsl::DSL;
 use crate::treepp::Script;
 use anyhow::{Error, Result};
+use bitcoin::opcodes::OP_TRUE;
 use bitcoin_script::script;
-use bitcoin_scriptexec::execute_script;
+use bitcoin_scriptexec::{convert_to_witness, execute_script};
 
 pub mod data_type;
 
@@ -21,8 +22,6 @@ pub mod compiler;
 
 pub(crate) mod treepp {
     pub use bitcoin_script::{define_pushable, script};
-    #[cfg(test)]
-    pub use bitcoin_scriptexec::execute_script;
 
     define_pushable!();
     pub use bitcoin::ScriptBuf as Script;
@@ -30,7 +29,7 @@ pub(crate) mod treepp {
 
 use crate::treepp::*;
 
-pub fn test_program(dsl: DSL) -> Result<()> {
+pub fn test_program(dsl: DSL, expected_stack: Script) -> Result<()> {
     let program = Compiler::compiler(dsl)?;
 
     let mut script = script! {
@@ -43,6 +42,20 @@ pub fn test_program(dsl: DSL) -> Result<()> {
     }
     .to_bytes();
     script.extend_from_slice(program.script.as_bytes());
+
+    let expected_final_stack = convert_to_witness(expected_stack)
+        .map_err(|x| anyhow::Error::msg(format!("final stack parsing error: {:?}", x)))?;
+    for elem in expected_final_stack.iter() {
+        script.extend_from_slice(
+            script! {
+                { elem.to_vec() }
+                OP_EQUALVERIFY
+            }
+            .as_bytes(),
+        );
+    }
+
+    script.push(OP_TRUE.to_u8());
 
     let script = Script::from_bytes(script);
 
