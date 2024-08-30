@@ -173,11 +173,11 @@ impl Compiler {
             //
             // the list is reversed with the mind that doing so may reduce the pull/roll distance and save the script length
 
+            let pos = stack.get_relative_position(idx)?;
+            let len = stack.get_length(idx)?;
+
             if output_list_rev[i..].contains(&idx) {
                 // pick
-                let pos = stack.get_relative_position(idx)?;
-                let len = stack.get_length(idx)?;
-
                 script.extend_from_slice(
                     script! {
                         for _ in 0..len {
@@ -193,11 +193,7 @@ impl Compiler {
                 output_total_len += len;
             } else {
                 // roll
-                let pos = stack.get_relative_position(idx)?;
-                let len = stack.get_length(idx)?;
-
                 stack.pull(idx)?;
-
                 script.extend_from_slice(
                     script! {
                         for _ in 0..len {
@@ -210,6 +206,7 @@ impl Compiler {
                     .as_bytes(),
                 );
             }
+            output_total_len += len;
         }
 
         // clear all the remaining elements
