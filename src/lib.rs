@@ -43,7 +43,6 @@ pub fn test_program(dsl: DSL, expected_stack: Script) -> Result<()> {
     }
     .to_bytes();
     script.extend_from_slice(program.script.as_bytes());
-    script.push(OP_RETURN.to_u8());
 
     let expected_final_stack = convert_to_witness(expected_stack)
         .map_err(|x| anyhow::Error::msg(format!("final stack parsing error: {:?}", x)))?;

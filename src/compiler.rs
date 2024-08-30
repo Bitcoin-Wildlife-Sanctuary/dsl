@@ -3,7 +3,6 @@ use crate::script::CompiledProgram;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
-use bitcoin::opcodes::all::OP_RETURN;
 use bitcoin::opcodes::Ordinary::{OP_2DROP, OP_DROP, OP_FROMALTSTACK};
 use bitcoin::ScriptBuf;
 
