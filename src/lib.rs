@@ -2,8 +2,6 @@ use crate::compiler::Compiler;
 use crate::dsl::DSL;
 use crate::treepp::Script;
 use anyhow::{Error, Result};
-use bitcoin::opcodes::all::OP_PUSHNUM_NEG1;
-use bitcoin::opcodes::Ordinary::OP_EQUALVERIFY;
 use bitcoin::opcodes::OP_TRUE;
 use bitcoin_script::script;
 use bitcoin_scriptexec::{convert_to_witness, execute_script};
@@ -48,22 +46,13 @@ pub fn test_program(dsl: DSL, expected_stack: Script) -> Result<()> {
     let expected_final_stack = convert_to_witness(expected_stack)
         .map_err(|x| anyhow::Error::msg(format!("final stack parsing error: {:?}", x)))?;
     for elem in expected_final_stack.iter().rev() {
-        if elem.len() == 1 && ((elem[0] == 0x81) || (0 < elem[0] && elem[0] <= 16)) {
-            if elem[0] == 0x81 {
-                script.push(OP_PUSHNUM_NEG1.to_u8());
-            } else {
-                script.push(0x50 + elem[0]);
+        script.extend_from_slice(
+            script! {
+                { elem.to_vec() }
+                OP_EQUALVERIFY
             }
-            script.push(OP_EQUALVERIFY.to_u8());
-        } else {
-            script.extend_from_slice(
-                script! {
-                    { elem.to_vec() }
-                    OP_EQUALVERIFY
-                }
-                .as_bytes(),
-            );
-        }
+            .as_bytes(),
+        );
     }
 
     script.push(OP_TRUE.to_u8());
