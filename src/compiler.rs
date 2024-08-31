@@ -2,9 +2,11 @@ use crate::dsl::{TraceEntry, DSL};
 use crate::script::CompiledProgram;
 use crate::stack::Stack;
 use crate::treepp::*;
-use anyhow::Result;
+use anyhow::{Error, Result};
 use bitcoin::opcodes::Ordinary::{OP_2DROP, OP_DROP, OP_FROMALTSTACK};
 use bitcoin::ScriptBuf;
+use crate::functions::AcceptableFunctionMetadata;
+use crate::options::Options;
 
 pub struct Compiler;
 
@@ -56,11 +58,16 @@ impl Compiler {
                         .get(&function_name.to_string())
                         .unwrap();
 
+                    let input = match function_metadata {
+                        AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.input,
+                        AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input
+                    };
+
                     let mut deferred_ref = vec![];
                     let mut num_cloned_input_elements = 0;
                     for (i, (&input_idx, input_type)) in inputs
                         .iter()
-                        .zip(function_metadata.input.iter())
+                        .zip(input.iter())
                         .enumerate()
                     {
                         let input_type_name = if input_type.starts_with("&") {
@@ -122,9 +129,113 @@ impl Compiler {
                         ref_positions.push(stack.get_relative_position(input_idx)?);
                     }
 
-                    script.extend_from_slice(
-                        (function_metadata.script_generator)(&ref_positions)?.as_bytes(),
-                    );
+                    match function_metadata {
+                        AcceptableFunctionMetadata::FunctionWithoutOptions(v) => {
+                            script.extend_from_slice((v.script_generator)(&ref_positions)?.as_bytes());
+                        }
+                        AcceptableFunctionMetadata::FunctionWithOptions(v) => {
+                            script.extend_from_slice((v.script_generator)(&ref_positions, &Options::new())?.as_bytes());
+                        }
+                    }
+
+                    let output = match function_metadata {
+                        AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.output,
+                        AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.output,
+                    };
+
+                    // push the corresponding outputs
+                    for output_type in output.iter() {
+                        let data_type_metadata = dsl
+                            .data_type_registry
+                            .map
+                            .get(&output_type.to_string())
+                            .unwrap();
+                        stack
+                            .push_to_stack(allocated_idx, data_type_metadata.element_type.len())?;
+                        allocated_idx += 1;
+                    }
+
+                    cur_time += 1;
+                }
+                TraceEntry::FunctionCallWithOptions(function_name, inputs, options) => {
+                    let function_metadata = dsl
+                        .function_registry
+                        .map
+                        .get(&function_name.to_string())
+                        .unwrap();
+
+                    let function_metadata = match function_metadata {
+                        AcceptableFunctionMetadata::FunctionWithOptions(v) => v,
+                        _ => return Err(Error::msg("The function does not offer options")),
+                    };
+
+                    let mut deferred_ref = vec![];
+                    let mut num_cloned_input_elements = 0;
+                    for (i, (&input_idx, input_type)) in inputs
+                        .iter()
+                        .zip(function_metadata.input.iter())
+                        .enumerate()
+                    {
+                        let input_type_name = if input_type.starts_with("&") {
+                            input_type.split_at(1).1
+                        } else {
+                            input_type
+                        };
+
+                        let input_metadata = dsl
+                            .data_type_registry
+                            .map
+                            .get(&input_type_name.to_string())
+                            .unwrap();
+
+                        if input_type.starts_with("&") {
+                            deferred_ref.push(input_idx);
+                            // do not obtain the location of the ref-only element before we clone other inputs.
+                        } else {
+                            let len = input_metadata.element_type.len();
+                            let pos = stack.get_relative_position(input_idx)?;
+
+                            if last_visit[input_idx] == cur_time
+                                && !inputs[i..].contains(&input_idx)
+                                && !dsl.output.contains(&input_idx)
+                            {
+                                // roll
+                                stack.pull(input_idx)?;
+
+                                script.extend_from_slice(
+                                    script! {
+                                        for _ in 0..len {
+                                            { pos + num_cloned_input_elements } OP_ROLL
+                                        }
+                                    }
+                                        .as_bytes(),
+                                );
+
+                                num_cloned_input_elements += len;
+                            } else {
+                                // pick
+                                script.extend_from_slice(
+                                    script! {
+                                        for _ in 0..len {
+                                            { pos + num_cloned_input_elements } OP_PICK
+                                        }
+                                    }
+                                        .as_bytes(),
+                                );
+
+                                num_cloned_input_elements += len;
+                            }
+                        }
+                    }
+
+                    // It takes into the account of the elements that disappear due to pull,
+                    // but it doesn't consider elements that are just copied/moved near the function stack.
+                    let mut ref_positions = vec![];
+                    for &input_idx in deferred_ref.iter() {
+                        ref_positions.push(stack.get_relative_position(input_idx)?);
+                    }
+
+                    script.extend_from_slice((function_metadata.script_generator)(&ref_positions, &options)?.as_bytes());
 
                     // push the corresponding outputs
                     for output_type in function_metadata.output.iter() {

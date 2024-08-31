@@ -1,8 +1,9 @@
 use crate::data_type::{DataTypeMetadata, DataTypeRegistry};
-use crate::functions::{FunctionMetadata, FunctionRegistry};
+use crate::functions::{AcceptableFunctionMetadata, FunctionRegistry};
 use crate::treepp::pushable::{Builder, Pushable};
 use anyhow::{Error, Result};
 use indexmap::IndexMap;
+use crate::options::Options;
 
 pub struct DSL {
     pub data_type_registry: DataTypeRegistry,
@@ -88,6 +89,7 @@ impl Pushable for &Element {
 #[derive(Clone)]
 pub enum TraceEntry {
     FunctionCall(String, Vec<usize>),
+    FunctionCallWithOptions(String, Vec<usize>, Options),
     AllocatedConstant(usize),
     AllocatedHint(usize),
 }
@@ -145,8 +147,8 @@ impl DSL {
             .insert(name.to_string(), DataTypeMetadata { element_type });
     }
 
-    pub fn add_function(&mut self, name: impl ToString, meta: FunctionMetadata) {
-        self.function_registry.map.insert(name.to_string(), meta);
+    pub fn add_function(&mut self, name: impl ToString, meta: impl Into<AcceptableFunctionMetadata>) {
+        self.function_registry.map.insert(name.to_string(), meta.into());
     }
 
     fn alloc(&mut self, data_type: impl ToString, data: Element) -> Result<usize> {
@@ -310,6 +312,87 @@ impl DSL {
             .get(&function_name.to_string())
             .unwrap();
 
+
+        let input = match function_metadata {
+            AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.input,
+            AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input
+        };
+
+        if input.len() != input_idxs.len() {
+            return Err(Error::msg("The number of inputs does not match"));
+        }
+
+        for (input_idx, &input_type) in input_idxs.iter().zip(input.iter()) {
+            let stack_entry = self.memory.get_mut(input_idx).unwrap();
+            if stack_entry.data_type != input_type
+                && input_type != format!("&{}", stack_entry.data_type)
+            {
+                return Err(Error::msg("The input data type mismatches"));
+            }
+        }
+
+        let output = match function_metadata {
+            AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.output,
+            AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.output
+        };
+
+        let output_types = output.clone();
+
+        let exec_result = match function_metadata {
+            AcceptableFunctionMetadata::FunctionWithoutOptions(v) => {
+                (v.trace_generator)(self, &input_idxs)?
+            }
+            AcceptableFunctionMetadata::FunctionWithOptions(v) => {
+                (v.trace_generator)(self, &input_idxs, &Options::new())?
+            }
+        };
+
+        if exec_result.new_elements.len() != output_types.len() {
+            return Err(Error::msg("The number of outputs does not match"));
+        }
+
+        self.hint.extend(exec_result.new_hints);
+
+        let outputs = handle_output(self, &output_types, exec_result.new_elements)?;
+
+        self.trace.push(TraceEntry::FunctionCall(
+            function_name.to_string(),
+            input_idxs.to_vec(),
+        ));
+
+        Ok(outputs)
+    }
+
+    pub fn execute_with_options(
+        &mut self,
+        function_name: impl ToString,
+        input_idxs: &[usize],
+        options: &Options,
+    ) -> Result<Vec<usize>> {
+        if self.num_inputs.is_none() {
+            self.num_inputs = Some(self.memory_last_idx);
+        }
+
+        if self
+            .function_registry
+            .map
+            .get(&function_name.to_string())
+            .is_none()
+        {
+            return Err(Error::msg("The function has not been registered"));
+        }
+
+        let function_metadata = self
+            .function_registry
+            .map
+            .get(&function_name.to_string())
+            .unwrap();
+
+        let function_metadata = match function_metadata {
+            AcceptableFunctionMetadata::FunctionWithOptions(v) => v,
+            _ => return Err(Error::msg("The function does not offer options")),
+        };
+
         if function_metadata.input.len() != input_idxs.len() {
             return Err(Error::msg("The number of inputs does not match"));
         }
@@ -324,7 +407,8 @@ impl DSL {
         }
 
         let output_types = function_metadata.output.clone();
-        let exec_result = (function_metadata.trace_generator)(self, &input_idxs)?;
+
+        let exec_result = (function_metadata.trace_generator)(self, &input_idxs, &options)?;
 
         if exec_result.new_elements.len() != output_types.len() {
             return Err(Error::msg("The number of outputs does not match"));
@@ -332,29 +416,35 @@ impl DSL {
 
         self.hint.extend(exec_result.new_hints);
 
-        let mut outputs = vec![];
-        for (&output_type, entry) in output_types.iter().zip(exec_result.new_elements) {
-            if output_type != entry.data_type {
-                return Err(Error::msg("The output data type mismatches"));
-            }
-            let data_type_metadata = self.data_type_registry.map.get(output_type).unwrap();
-            if !entry.data.match_type(&data_type_metadata.element_type) {
-                return Err(Error::msg(
-                    "The output data does not match the type definitions",
-                ));
-            }
+        let outputs = handle_output(self, &output_types, exec_result.new_elements)?;
 
-            let idx = self.memory_last_idx;
-            self.memory_last_idx += 1;
-            self.memory.insert(idx, entry);
-            outputs.push(idx);
-        }
-
-        self.trace.push(TraceEntry::FunctionCall(
+        self.trace.push(TraceEntry::FunctionCallWithOptions(
             function_name.to_string(),
             input_idxs.to_vec(),
+            options.clone()
         ));
 
         Ok(outputs)
     }
+}
+
+fn handle_output(dsl: &mut DSL, output_types: &[&str], new_elements: Vec<MemoryEntry>) -> Result<Vec<usize>> {
+    let mut outputs = vec![];
+    for (&output_type, entry) in output_types.iter().zip(new_elements) {
+        if output_type != entry.data_type {
+            return Err(Error::msg("The output data type mismatches"));
+        }
+        let data_type_metadata = dsl.data_type_registry.map.get(output_type).unwrap();
+        if !entry.data.match_type(&data_type_metadata.element_type) {
+            return Err(Error::msg(
+                "The output data does not match the type definitions",
+            ));
+        }
+
+        let idx = dsl.memory_last_idx;
+        dsl.memory_last_idx += 1;
+        dsl.memory.insert(idx, entry);
+        outputs.push(idx);
+    }
+    Ok(outputs)
 }

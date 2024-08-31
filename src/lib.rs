@@ -20,6 +20,8 @@ pub mod stack;
 
 pub mod compiler;
 
+pub mod options;
+
 pub(crate) mod treepp {
     pub use bitcoin_script::{define_pushable, script};
 
