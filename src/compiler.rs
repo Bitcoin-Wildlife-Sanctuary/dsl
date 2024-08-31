@@ -157,6 +157,26 @@ impl Compiler {
                         .as_bytes(),
                     );
                 }
+                TraceEntry::AllocatedHint(idx) => {
+                    let data_type = &dsl.memory.get(idx).unwrap().data_type;
+                    let input_metadata = dsl
+                        .data_type_registry
+                        .map
+                        .get(&data_type.to_string())
+                        .unwrap();
+                    let len = input_metadata.element_type.len();
+                    stack.push_to_stack(*idx, len)?;
+                    allocated_idx += 1;
+
+                    script.extend_from_slice(
+                        script! {
+                            for _ in 0..len {
+                                OP_DEPTH OP_1SUB OP_ROLL
+                            }
+                        }
+                        .as_bytes(),
+                    );
+                }
             }
         }
 

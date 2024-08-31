@@ -89,6 +89,7 @@ impl Pushable for &Element {
 pub enum TraceEntry {
     FunctionCall(String, Vec<usize>),
     AllocatedConstant(usize),
+    AllocatedHint(usize),
 }
 
 impl Element {
@@ -192,6 +193,16 @@ impl DSL {
             ));
         }
         Self::alloc(self, data_type, data)
+    }
+
+    pub fn alloc_hint(&mut self, data_type: impl ToString, data: Element) -> Result<usize> {
+        if self.num_inputs.is_none() {
+            self.num_inputs = Some(self.memory_last_idx);
+        }
+        let idx = Self::alloc(self, data_type, data)?;
+        self.hint.push(self.memory.get(&idx).unwrap().clone());
+        self.trace.push(TraceEntry::AllocatedHint(idx));
+        Ok(idx)
     }
 
     pub fn set_program_output(
