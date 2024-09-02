@@ -88,6 +88,7 @@ impl Compiler {
                         } else {
                             let len = input_metadata.element_type.len();
                             let pos = stack.get_relative_position(input_idx)?;
+                            let distance = pos + num_cloned_input_elements;
 
                             if last_visit[input_idx] == cur_time
                                 && !inputs[i..].contains(&input_idx)
@@ -95,28 +96,11 @@ impl Compiler {
                             {
                                 // roll
                                 stack.pull(input_idx)?;
-
-                                script.extend_from_slice(
-                                    script! {
-                                        for _ in 0..len {
-                                            { pos + num_cloned_input_elements } OP_ROLL
-                                        }
-                                    }
-                                    .as_bytes(),
-                                );
-
+                                script.extend_from_slice(roll_script(distance, len).as_bytes());
                                 num_cloned_input_elements += len;
                             } else {
                                 // pick
-                                script.extend_from_slice(
-                                    script! {
-                                        for _ in 0..len {
-                                            { pos + num_cloned_input_elements } OP_PICK
-                                        }
-                                    }
-                                    .as_bytes(),
-                                );
-
+                                script.extend_from_slice(pick_script(distance, len).as_bytes());
                                 num_cloned_input_elements += len;
                             }
                         }
@@ -194,6 +178,7 @@ impl Compiler {
                         } else {
                             let len = input_metadata.element_type.len();
                             let pos = stack.get_relative_position(input_idx)?;
+                            let distance = pos + num_cloned_input_elements;
 
                             if last_visit[input_idx] == cur_time
                                 && !inputs[i..].contains(&input_idx)
@@ -201,28 +186,11 @@ impl Compiler {
                             {
                                 // roll
                                 stack.pull(input_idx)?;
-
-                                script.extend_from_slice(
-                                    script! {
-                                        for _ in 0..len {
-                                            { pos + num_cloned_input_elements } OP_ROLL
-                                        }
-                                    }
-                                        .as_bytes(),
-                                );
-
+                                script.extend_from_slice(roll_script(distance, len).as_bytes());
                                 num_cloned_input_elements += len;
                             } else {
                                 // pick
-                                script.extend_from_slice(
-                                    script! {
-                                        for _ in 0..len {
-                                            { pos + num_cloned_input_elements } OP_PICK
-                                        }
-                                    }
-                                        .as_bytes(),
-                                );
-
+                                script.extend_from_slice(pick_script(distance, len).as_bytes());
                                 num_cloned_input_elements += len;
                             }
                         }
@@ -357,5 +325,53 @@ impl Compiler {
             script: ScriptBuf::from_bytes(script),
             hint: dsl.hint,
         })
+    }
+}
+
+fn roll_script(distance: usize, len: usize) -> Script {
+    if distance == len - 1 {
+        script! {} // do nothing, it is already on the top of the stack
+    } else {
+        if distance == 1 {
+            script! {
+                for _ in 0..len {
+                    OP_SWAP
+                }
+            }
+        } else if distance == 2 {
+            script! {
+                for _ in 0..len {
+                    OP_ROT
+                }
+            }
+        } else {
+            script! {
+                for _ in 0..len {
+                    { distance } OP_ROLL
+                }
+            }
+        }
+    }
+}
+
+fn pick_script(distance: usize, len: usize) -> Script {
+    if distance == 0 {
+        script! {
+            for _ in 0..len {
+                OP_DUP
+            }
+        }
+    } else if distance == 1 {
+        script! {
+            for _ in 0..len {
+                OP_OVER
+            }
+        }
+    } else {
+        script! {
+            for _ in 0..len {
+                { distance } OP_PICK
+            }
+        }
     }
 }
