@@ -160,11 +160,7 @@ impl Compiler {
                         .zip(function_metadata.input.iter())
                         .enumerate()
                     {
-                        let input_type_name = if input_type.starts_with("&") {
-                            input_type.split_at(1).1
-                        } else {
-                            input_type
-                        };
+                        let input_type_name = dsl.memory.get(&input_idx).unwrap().data_type.clone();
 
                         let input_metadata = dsl
                             .data_type_registry

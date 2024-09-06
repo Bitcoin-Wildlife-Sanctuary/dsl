@@ -141,14 +141,25 @@ impl DSL {
         }
     }
 
-    pub fn add_data_type(&mut self, name: impl ToString, element_type: ElementType) {
+    pub fn add_data_type(&mut self, name: impl ToString, element_type: ElementType) -> Result<()> {
+        if name.to_string() == "any" {
+            return Err(Error::msg("The any type cannot be registered"));
+        }
+        if self.data_type_registry.map.get(&name.to_string()).is_some() {
+            return Err(Error::msg("This type has already been registered"));
+        }
         self.data_type_registry
             .map
             .insert(name.to_string(), DataTypeMetadata { element_type });
+        Ok(())
     }
 
-    pub fn add_function(&mut self, name: impl ToString, meta: impl Into<AcceptableFunctionMetadata>) {
+    pub fn add_function(&mut self, name: impl ToString, meta: impl Into<AcceptableFunctionMetadata>) -> Result<()> {
+        if self.function_registry.map.get(&name.to_string()).is_some() {
+            return Err(Error::msg("This function name has already been registered"));
+        }
         self.function_registry.map.insert(name.to_string(), meta.into());
+        Ok(())
     }
 
     fn alloc(&mut self, data_type: impl ToString, data: Element) -> Result<usize> {
@@ -312,7 +323,6 @@ impl DSL {
             .get(&function_name.to_string())
             .unwrap();
 
-
         let input = match function_metadata {
             AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.input,
             AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input
@@ -323,11 +333,13 @@ impl DSL {
         }
 
         for (input_idx, &input_type) in input_idxs.iter().zip(input.iter()) {
-            let stack_entry = self.memory.get_mut(input_idx).unwrap();
-            if stack_entry.data_type != input_type
-                && input_type != format!("&{}", stack_entry.data_type)
-            {
-                return Err(Error::msg("The input data type mismatches"));
+            if input_type != "any" {
+                let stack_entry = self.memory.get_mut(input_idx).unwrap();
+                if stack_entry.data_type != input_type
+                    && input_type != format!("&{}", stack_entry.data_type)
+                {
+                    return Err(Error::msg("The input data type mismatches"));
+                }
             }
         }
 
@@ -398,11 +410,13 @@ impl DSL {
         }
 
         for (input_idx, &input_type) in input_idxs.iter().zip(function_metadata.input.iter()) {
-            let stack_entry = self.memory.get_mut(input_idx).unwrap();
-            if stack_entry.data_type != input_type
-                && input_type != format!("&{}", stack_entry.data_type)
-            {
-                return Err(Error::msg("The input data type mismatches"));
+            if input_type != "any" {
+                let stack_entry = self.memory.get_mut(input_idx).unwrap();
+                if stack_entry.data_type != input_type
+                    && input_type != format!("&{}", stack_entry.data_type)
+                {
+                    return Err(Error::msg("The input data type mismatches"));
+                }
             }
         }
 

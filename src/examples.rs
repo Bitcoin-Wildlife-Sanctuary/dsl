@@ -34,7 +34,7 @@ mod test {
         let mut a_val = prng.gen_range(0..((1i64 << 31) - 1)) as i32;
 
         let mut dsl = DSL::new();
-        dsl.add_data_type("m31", ElementType::Num);
+        dsl.add_data_type("m31", ElementType::Num).unwrap();
         dsl.add_function(
             "m31_mult",
             FunctionMetadata {
@@ -43,7 +43,7 @@ mod test {
                 input: vec!["m31", "m31"],
                 output: vec!["m31"],
             },
-        );
+        ).unwrap();
 
         let mut a = dsl.alloc_input("m31", Element::Num(a_val)).unwrap();
 
