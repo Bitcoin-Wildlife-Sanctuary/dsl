@@ -24,6 +24,12 @@ impl Compiler {
                         last_visit[i] = cur_time;
                     }
                     cur_time += 1;
+                },
+                TraceEntry::FunctionCallWithOptions(_, inputs, _) => {
+                    for &i in inputs.iter() {
+                        last_visit[i] = cur_time;
+                    }
+                    cur_time += 1;
                 }
                 _ => {}
             }
