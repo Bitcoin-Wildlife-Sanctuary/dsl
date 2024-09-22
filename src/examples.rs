@@ -43,7 +43,8 @@ mod test {
                 input: vec!["m31", "m31"],
                 output: vec!["m31"],
             },
-        ).unwrap();
+        )
+        .unwrap();
 
         let mut a = dsl.alloc_input("m31", Element::Num(a_val)).unwrap();
 

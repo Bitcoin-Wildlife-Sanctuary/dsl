@@ -1,8 +1,8 @@
 use crate::dsl::{MemoryEntry, DSL};
+use crate::options::Options;
 use crate::treepp::Script;
 use anyhow::Result;
 use std::collections::HashMap;
-use crate::options::Options;
 
 pub struct FunctionRegistry {
     pub map: HashMap<String, AcceptableFunctionMetadata>,

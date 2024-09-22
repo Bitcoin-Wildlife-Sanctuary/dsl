@@ -1,9 +1,9 @@
 use crate::data_type::{DataTypeMetadata, DataTypeRegistry};
 use crate::functions::{AcceptableFunctionMetadata, FunctionRegistry};
+use crate::options::Options;
 use crate::treepp::pushable::{Builder, Pushable};
 use anyhow::{Error, Result};
 use indexmap::IndexMap;
-use crate::options::Options;
 
 pub struct DSL {
     pub data_type_registry: DataTypeRegistry,
@@ -154,11 +154,17 @@ impl DSL {
         Ok(())
     }
 
-    pub fn add_function(&mut self, name: impl ToString, meta: impl Into<AcceptableFunctionMetadata>) -> Result<()> {
+    pub fn add_function(
+        &mut self,
+        name: impl ToString,
+        meta: impl Into<AcceptableFunctionMetadata>,
+    ) -> Result<()> {
         if self.function_registry.map.get(&name.to_string()).is_some() {
             return Err(Error::msg("This function name has already been registered"));
         }
-        self.function_registry.map.insert(name.to_string(), meta.into());
+        self.function_registry
+            .map
+            .insert(name.to_string(), meta.into());
         Ok(())
     }
 
@@ -325,7 +331,7 @@ impl DSL {
 
         let input = match function_metadata {
             AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.input,
-            AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input
+            AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input,
         };
 
         if input.len() != input_idxs.len() {
@@ -345,7 +351,7 @@ impl DSL {
 
         let output = match function_metadata {
             AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.output,
-            AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.output
+            AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.output,
         };
 
         let output_types = output.clone();
@@ -435,14 +441,18 @@ impl DSL {
         self.trace.push(TraceEntry::FunctionCallWithOptions(
             function_name.to_string(),
             input_idxs.to_vec(),
-            options.clone()
+            options.clone(),
         ));
 
         Ok(outputs)
     }
 }
 
-fn handle_output(dsl: &mut DSL, output_types: &[&str], new_elements: Vec<MemoryEntry>) -> Result<Vec<usize>> {
+fn handle_output(
+    dsl: &mut DSL,
+    output_types: &[&str],
+    new_elements: Vec<MemoryEntry>,
+) -> Result<Vec<usize>> {
     let mut outputs = vec![];
     for (&output_type, entry) in output_types.iter().zip(new_elements) {
         if output_type != entry.data_type {

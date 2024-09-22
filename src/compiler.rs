@@ -1,12 +1,12 @@
 use crate::dsl::{TraceEntry, DSL};
+use crate::functions::AcceptableFunctionMetadata;
+use crate::options::Options;
 use crate::script::CompiledProgram;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::{Error, Result};
 use bitcoin::opcodes::Ordinary::{OP_2DROP, OP_DROP, OP_FROMALTSTACK};
 use bitcoin::ScriptBuf;
-use crate::functions::AcceptableFunctionMetadata;
-use crate::options::Options;
 
 pub struct Compiler;
 
@@ -24,7 +24,7 @@ impl Compiler {
                         last_visit[i] = cur_time;
                     }
                     cur_time += 1;
-                },
+                }
                 TraceEntry::FunctionCallWithOptions(_, inputs, _) => {
                     for &i in inputs.iter() {
                         last_visit[i] = cur_time;
@@ -66,15 +66,12 @@ impl Compiler {
 
                     let input = match function_metadata {
                         AcceptableFunctionMetadata::FunctionWithoutOptions(v) => &v.input,
-                        AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input
+                        AcceptableFunctionMetadata::FunctionWithOptions(v) => &v.input,
                     };
 
                     let mut deferred_ref = vec![];
                     let mut num_cloned_input_elements = 0;
-                    for (i, (&input_idx, input_type)) in inputs
-                        .iter()
-                        .zip(input.iter())
-                        .enumerate()
+                    for (i, (&input_idx, input_type)) in inputs.iter().zip(input.iter()).enumerate()
                     {
                         let input_type_name = dsl.memory.get(&input_idx).unwrap().data_type.clone();
 
@@ -93,7 +90,7 @@ impl Compiler {
                             let distance = pos + num_cloned_input_elements;
 
                             if last_visit[input_idx] == cur_time
-                                && !inputs[i..].contains(&input_idx)
+                                && !(i < inputs.len() - 1 && inputs[i + 1..].contains(&input_idx))
                                 && !dsl.output.contains(&input_idx)
                             {
                                 // roll
@@ -117,10 +114,14 @@ impl Compiler {
 
                     match function_metadata {
                         AcceptableFunctionMetadata::FunctionWithoutOptions(v) => {
-                            script.extend_from_slice((v.script_generator)(&ref_positions)?.as_bytes());
+                            script.extend_from_slice(
+                                (v.script_generator)(&ref_positions)?.as_bytes(),
+                            );
                         }
                         AcceptableFunctionMetadata::FunctionWithOptions(v) => {
-                            script.extend_from_slice((v.script_generator)(&ref_positions, &Options::new())?.as_bytes());
+                            script.extend_from_slice(
+                                (v.script_generator)(&ref_positions, &Options::new())?.as_bytes(),
+                            );
                         }
                     }
 
@@ -179,7 +180,7 @@ impl Compiler {
                             let distance = pos + num_cloned_input_elements;
 
                             if last_visit[input_idx] == cur_time
-                                && !inputs[i..].contains(&input_idx)
+                                && !(i < inputs.len() - 1 && inputs[i + 1..].contains(&input_idx))
                                 && !dsl.output.contains(&input_idx)
                             {
                                 // roll
@@ -201,7 +202,9 @@ impl Compiler {
                         ref_positions.push(stack.get_relative_position(input_idx)?);
                     }
 
-                    script.extend_from_slice((function_metadata.script_generator)(&ref_positions, &options)?.as_bytes());
+                    script.extend_from_slice(
+                        (function_metadata.script_generator)(&ref_positions, &options)?.as_bytes(),
+                    );
 
                     // push the corresponding outputs
                     for output_type in function_metadata.output.iter() {
