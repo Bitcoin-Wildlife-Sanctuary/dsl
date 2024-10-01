@@ -12,6 +12,7 @@ bitcoin = "0.32.0"
 bitcoin-scriptexec = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-scriptexec/", features = ["debug"] }
 fenwick-tree = "0.1.0"
 anyhow = "1.0.86"
+clap = { version = "4.5.18", features = ["derive"] }
 
 [dev-dependencies]
-rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31/" }
+rust-bitcoin-m31 = { git = "https://github.com/Bitcoin-Wildlife-Sanctuary/rust-bitcoin-m31", tag = "1.0.0" }

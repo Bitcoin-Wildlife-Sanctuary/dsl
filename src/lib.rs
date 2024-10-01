@@ -1,20 +1,16 @@
 use crate::compiler::Compiler;
-use crate::dsl::DSL;
+use crate::constraint_system::ConstraintSystemRef;
 use crate::treepp::Script;
 use anyhow::{Error, Result};
 use bitcoin::opcodes::OP_TRUE;
 use bitcoin_script::script;
 use bitcoin_scriptexec::{convert_to_witness, execute_script};
 
-pub mod data_type;
+pub mod bvar;
 
-pub mod functions;
-
-pub mod dsl;
+pub mod constraint_system;
 
 pub mod examples;
-
-pub mod script;
 
 pub mod stack;
 
@@ -31,8 +27,8 @@ pub(crate) mod treepp {
 
 use crate::treepp::*;
 
-pub fn test_program(dsl: DSL, expected_stack: Script) -> Result<()> {
-    let program = Compiler::compiler(dsl)?;
+pub fn test_program(cs: ConstraintSystemRef, expected_stack: Script) -> Result<()> {
+    let program = Compiler::compile(cs)?;
 
     let mut script = script! {
         for elem in program.hint.iter() {

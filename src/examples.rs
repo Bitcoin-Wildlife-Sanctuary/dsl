@@ -1,27 +1,78 @@
 #[cfg(test)]
 mod test {
-    use crate::dsl::{Element, ElementType, MemoryEntry, DSL};
-    use crate::functions::{FunctionMetadata, FunctionOutput};
+    use crate::bvar::{AllocVar, AllocationMode, BVar};
+    use crate::constraint_system::{ConstraintSystem, ConstraintSystemRef, Element};
+    use crate::options::Options;
+    use crate::stack::Stack;
     use crate::test_program;
     use crate::treepp::*;
     use anyhow::Result;
     use bitcoin::ScriptBuf;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
+    use std::ops::Mul;
 
-    fn m31_mult(dsl: &mut DSL, inputs: &[usize]) -> Result<FunctionOutput> {
-        let a = dsl.get_num(inputs[0])?;
-        let b = dsl.get_num(inputs[1])?;
-
-        let res = (a as i64) * (b as i64) % ((1i64 << 31) - 1);
-
-        Ok(FunctionOutput {
-            new_elements: vec![MemoryEntry::new("m31", Element::Num(res as i32))],
-            new_hints: vec![],
-        })
+    pub struct M31Var {
+        pub variable: usize,
+        pub value: u32,
+        pub cs: ConstraintSystemRef,
     }
 
-    fn m31_mult_gadget(_: &[usize]) -> Result<ScriptBuf> {
+    impl BVar for M31Var {
+        type Value = u32;
+
+        fn cs(&self) -> ConstraintSystemRef {
+            self.cs.clone()
+        }
+
+        fn variable(&self) -> Vec<usize> {
+            vec![self.variable]
+        }
+
+        fn length() -> usize {
+            1
+        }
+
+        fn value(&self) -> Result<Self::Value> {
+            Ok(self.value)
+        }
+    }
+
+    impl AllocVar for M31Var {
+        fn new_variable(
+            cs: &ConstraintSystemRef,
+            data: <Self as BVar>::Value,
+            mode: AllocationMode,
+        ) -> Result<Self> {
+            Ok(Self {
+                variable: cs.alloc(Element::Num(data as i32), mode)?,
+                value: data,
+                cs: cs.clone(),
+            })
+        }
+    }
+
+    impl Mul for &M31Var {
+        type Output = M31Var;
+
+        fn mul(self, rhs: Self) -> Self::Output {
+            let res = ((self.value as i64) * (rhs.value as i64) % ((1i64 << 31) - 1)) as u32;
+
+            let cs = self.cs.and(&rhs.cs);
+
+            cs.insert_script(
+                m31_mult_gadget,
+                [self.variable, rhs.variable],
+                &Options::new(),
+            )
+            .unwrap();
+
+            let res_var = M31Var::new_variable(&cs, res, AllocationMode::OUTPUT).unwrap();
+            res_var
+        }
+    }
+
+    fn m31_mult_gadget(_: &mut Stack, _: &Options) -> Result<ScriptBuf> {
         Ok(script! {
             { rust_bitcoin_m31::m31_mul() }
         })
@@ -31,44 +82,29 @@ mod test {
     fn test_m31_mult() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let mut a_val = prng.gen_range(0..((1i64 << 31) - 1)) as i32;
+        let mut a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
 
-        let mut dsl = DSL::new();
-        dsl.add_data_type("m31", ElementType::Num).unwrap();
-        dsl.add_function(
-            "m31_mult",
-            FunctionMetadata {
-                trace_generator: m31_mult,
-                script_generator: m31_mult_gadget,
-                input: vec!["m31", "m31"],
-                output: vec!["m31"],
-            },
-        )
-        .unwrap();
+        let cs = ConstraintSystem::new_ref();
 
-        let mut a = dsl.alloc_input("m31", Element::Num(a_val)).unwrap();
+        let mut a = M31Var::new_input(&cs, a_val).unwrap();
 
         for _ in 0..10 {
-            let b_val = prng.gen_range(0..((1i64 << 31) - 1));
-            let expected = (a_val as i64) * b_val % ((1i64 << 31) - 1);
+            let b_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
 
-            let b = dsl
-                .alloc_constant("m31", Element::Num(b_val as i32))
-                .unwrap();
+            let b = M31Var::new_constant(&cs, b_val).unwrap();
 
-            let res = dsl.execute("m31_mult", &[a, b]).unwrap();
-            assert_eq!(res.len(), 1);
-            let res_val = dsl.get_num(res[0]).unwrap();
-            assert_eq!(res_val, expected as i32);
+            let c = &a * &b;
+            let c_val = ((a_val as i64) * (b_val as i64) % ((1i64 << 31) - 1)) as u32;
+            assert_eq!(c.value, c_val);
 
-            a = res[0];
-            a_val = res_val;
+            a = c;
+            a_val = c_val;
         }
 
-        dsl.set_program_output("m31", a).unwrap();
+        cs.set_execution_output(&a).unwrap();
 
         test_program(
-            dsl,
+            cs,
             script! {
                 { a_val }
             },

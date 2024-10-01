@@ -1,12 +1,12 @@
 use anyhow::{Error, Result};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Options {
     pub map: HashMap<String, OptionsEntry>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum OptionsEntry {
     String(String),
     Binary(Vec<u8>),
