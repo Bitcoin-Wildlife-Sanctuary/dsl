@@ -105,8 +105,7 @@ impl WORMMemory {
 
         while next_index_to_load < self.value_map.len() {
             // load the next value
-            let new_hash_var =
-                HashVar::new_function_output(cs, self.hash_map[next_index_to_load].clone())?;
+            let new_hash_var = HashVar::new_hint(cs, self.hash_map[next_index_to_load].clone())?;
             next_index_to_load += 1;
 
             // update the current recomputed_write_hash_var

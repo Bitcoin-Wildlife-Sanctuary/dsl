@@ -8,6 +8,7 @@ use crate::options::Options;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
+use std::ops::Mul;
 
 pub struct M31LimbsVar {
     pub variables: [usize; 4],
@@ -76,18 +77,23 @@ impl From<&M31Var> for M31LimbsVar {
     }
 }
 
-impl M31LimbsVar {
-    fn table_mul(&self, table: &TableVar, rhs: &Self) -> Result<M31Var> {
+impl Mul<(&TableVar, &M31LimbsVar)> for &M31LimbsVar {
+    type Output = M31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31LimbsVar)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
         let cs = self.cs().and(&table.cs()).and(&rhs.cs());
 
         let res = ((convert_m31_from_limbs(&self.value) as i64
             * convert_m31_from_limbs(&rhs.value) as i64)
             % ((1i64 << 31) - 1)) as u32;
 
-        let c_limbs = M31Mult::compute_c_limbs_from_limbs(&self.value, &rhs.value)?;
+        let c_limbs = M31Mult::compute_c_limbs_from_limbs(&self.value, &rhs.value).unwrap();
 
-        let q = M31Mult::compute_q(&c_limbs)?;
-        let q_var = M31Var::new_hint(&cs, q)?;
+        let q = M31Mult::compute_q(&c_limbs).unwrap();
+        let q_var = M31Var::new_hint(&cs, q).unwrap();
 
         let options = Options::new().with_u32("table_ref", table.variables[0] as u32);
         cs.insert_script(
@@ -98,10 +104,11 @@ impl M31LimbsVar {
                 .chain(q_var.variables().iter())
                 .copied(),
             &options,
-        )?;
+        )
+        .unwrap();
 
-        let res_var = M31Var::new_function_output(&cs, res)?;
-        Ok(res_var)
+        let res_var = M31Var::new_function_output(&cs, res).unwrap();
+        res_var
     }
 }
 
@@ -221,7 +228,7 @@ mod test {
         let b_limbs = M31LimbsVar::from(&b);
 
         let table = TableVar::new_constant(&cs, ()).unwrap();
-        let res = a_limbs.table_mul(&table, &b_limbs).unwrap();
+        let res = &a_limbs * (&table, &b_limbs);
 
         cs.set_program_output(&res).unwrap();
 

@@ -1,3 +1,5 @@
+use crate::builtins::m31_limbs::M31LimbsVar;
+use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
 use crate::options::Options;
@@ -81,8 +83,21 @@ impl Mul for &M31Var {
         )
         .unwrap();
 
-        let res_var = M31Var::new_variable(&cs, res, AllocationMode::FunctionOutput).unwrap();
+        let res_var = M31Var::new_function_output(&cs, res).unwrap();
         res_var
+    }
+}
+
+impl Mul<(&TableVar, &M31Var)> for &M31Var {
+    type Output = M31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let self_limbs = M31LimbsVar::from(self);
+        let rhs_limbs = M31LimbsVar::from(rhs);
+        &self_limbs * (table, &rhs_limbs)
     }
 }
 
