@@ -36,3 +36,21 @@ pub fn OP_HINT() -> Script {
         OP_DEPTH OP_1SUB OP_ROLL
     }
 }
+
+pub fn pow2147483645(v: u32) -> u32 {
+    let t0 = sqn::<2>(v as i64) * v as i64 % ((1i64 << 31) - 1);
+    let t1 = sqn::<1>(t0) * t0 % ((1i64 << 31) - 1);
+    let t2 = sqn::<3>(t1) * t0 % ((1i64 << 31) - 1);
+    let t3 = sqn::<1>(t2) * t0 % ((1i64 << 31) - 1);
+    let t4 = sqn::<8>(t3) * t3 % ((1i64 << 31) - 1);
+    let t5 = sqn::<8>(t4) * t3 % ((1i64 << 31) - 1);
+    (sqn::<7>(t5) * t2 % ((1i64 << 31) - 1)) as u32
+}
+
+/// Computes `v^(2*n)`.
+fn sqn<const N: usize>(mut v: i64) -> i64 {
+    for _ in 0..N {
+        v = (v * v) % ((1i64 << 31) - 1);
+    }
+    v
+}

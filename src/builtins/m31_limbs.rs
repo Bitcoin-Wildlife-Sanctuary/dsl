@@ -1,6 +1,8 @@
 use crate::builtins::m31::M31Var;
 use crate::builtins::table::m31::{M31Mult, M31MultGadget};
-use crate::builtins::table::utils::{check_limb_format, convert_m31_from_limbs, OP_256MUL};
+use crate::builtins::table::utils::{
+    check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, pow2147483645, OP_256MUL,
+};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
@@ -113,6 +115,22 @@ impl Mul<(&TableVar, &M31LimbsVar)> for &M31LimbsVar {
 }
 
 impl M31LimbsVar {
+    pub fn inverse(&self, table: &TableVar) -> M31LimbsVar {
+        let cs = self.cs();
+
+        let inv = pow2147483645(convert_m31_from_limbs(&self.value));
+        let inv_limbs = convert_m31_to_limbs(inv);
+
+        let inv_limbs_var = M31LimbsVar::new_hint(&cs, inv_limbs).unwrap();
+
+        let expected_one = self * (table, &inv_limbs_var);
+        expected_one.is_one();
+
+        inv_limbs_var
+    }
+}
+
+impl M31LimbsVar {
     pub fn equalverify(&self, rhs: &Self) -> Result<()> {
         assert_eq!(self.value, rhs.value);
 
@@ -125,7 +143,7 @@ impl M31LimbsVar {
     }
 }
 
-fn m31_to_limbs_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+pub(crate) fn m31_to_limbs_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     // input: m31_var, limb1..4
     Ok(script! {
         check_limb_format
@@ -236,6 +254,34 @@ mod test {
             cs,
             script! {
                 { ((a_val as i64) * (b_val as i64) % ((1i64 << 31) - 1)) as u32 }
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_m31_limbs_inverse() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+
+        let cs = ConstraintSystem::new_ref();
+
+        let a = M31Var::new_constant(&cs, a_val).unwrap();
+        let a_limbs = M31LimbsVar::from(&a);
+
+        let table = TableVar::new_constant(&cs, ()).unwrap();
+
+        let a_inv_limbs = a_limbs.inverse(&table);
+
+        let res = &a_limbs * (&table, &a_inv_limbs);
+
+        cs.set_program_output(&res).unwrap();
+
+        test_program(
+            cs,
+            script! {
+                1
             },
         )
         .unwrap();

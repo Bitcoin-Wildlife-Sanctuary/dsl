@@ -1,4 +1,5 @@
-use crate::builtins::m31_limbs::M31LimbsVar;
+use crate::builtins::m31_limbs::{m31_to_limbs_gadget, M31LimbsVar};
+use crate::builtins::table::utils::pow2147483645;
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
@@ -101,10 +102,114 @@ impl Mul<(&TableVar, &M31Var)> for &M31Var {
     }
 }
 
+impl M31Var {
+    pub fn is_one(&self) {
+        assert_eq!(self.value, 1);
+        self.cs
+            .insert_script(m31_is_one_gadget, [self.variable], &Options::new())
+            .unwrap();
+    }
+
+    pub fn inverse(&self, table: &TableVar) -> Self {
+        let self_limbs = M31LimbsVar::from(self);
+        let inv_limbs = self_limbs.inverse(&table);
+
+        let cs = self.cs.and(&table.cs);
+        let inv = M31Var::new_hint(&cs, pow2147483645(self.value)).unwrap();
+
+        cs.insert_script(
+            m31_to_limbs_gadget,
+            inv.variables()
+                .iter()
+                .chain(inv_limbs.variables().iter())
+                .copied(),
+            &Options::new(),
+        )
+        .unwrap();
+
+        inv
+    }
+
+    pub fn inverse_without_table(&self) -> Self {
+        let inv = M31Var::new_hint(&self.cs, pow2147483645(self.value)).unwrap();
+
+        let res = self * &inv;
+        res.is_one();
+
+        inv
+    }
+}
+
 fn m31_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     Ok(rust_bitcoin_m31::m31_add())
 }
 
 fn m31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     Ok(rust_bitcoin_m31::m31_mul())
+}
+
+fn m31_is_one_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(script! {
+        1 OP_EQUALVERIFY
+    })
+}
+
+#[cfg(test)]
+mod test {
+    use crate::builtins::m31::M31Var;
+    use crate::builtins::table::TableVar;
+    use crate::bvar::AllocVar;
+    use crate::constraint_system::ConstraintSystem;
+    use crate::test_program;
+    use crate::treepp::*;
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+
+    #[test]
+    fn test_m31_inverse() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+
+        let cs = ConstraintSystem::new_ref();
+
+        let a = M31Var::new_constant(&cs, a_val).unwrap();
+        let table = TableVar::new_constant(&cs, ()).unwrap();
+
+        let a_inv = a.inverse(&table);
+        let res = &a * (&table, &a_inv);
+
+        cs.set_program_output(&res).unwrap();
+
+        test_program(
+            cs,
+            script! {
+                1
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_m31_inverse_without_table() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+
+        let cs = ConstraintSystem::new_ref();
+
+        let a = M31Var::new_constant(&cs, a_val).unwrap();
+        let a_inv = a.inverse_without_table();
+        let res = &a * &a_inv;
+
+        cs.set_program_output(&res).unwrap();
+
+        test_program(
+            cs,
+            script! {
+                1
+            },
+        )
+        .unwrap();
+    }
 }
