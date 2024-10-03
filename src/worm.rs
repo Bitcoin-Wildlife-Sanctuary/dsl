@@ -82,11 +82,11 @@ impl WORMMemory {
         self.cs
             .as_ref()
             .unwrap()
-            .set_execution_output(self.write_hash_var.as_ref().unwrap())?;
+            .set_program_output(self.write_hash_var.as_ref().unwrap())?;
         self.cs
             .as_ref()
             .unwrap()
-            .set_execution_output(self.read_hash_var.as_ref().unwrap())?;
+            .set_program_output(self.read_hash_var.as_ref().unwrap())?;
         Ok(())
     }
 
@@ -105,7 +105,8 @@ impl WORMMemory {
 
         while next_index_to_load < self.value_map.len() {
             // load the next value
-            let new_hash_var = HashVar::new_hint(cs, self.hash_map[next_index_to_load].clone())?;
+            let new_hash_var =
+                HashVar::new_function_output(cs, self.hash_map[next_index_to_load].clone())?;
             next_index_to_load += 1;
 
             // update the current recomputed_write_hash_var

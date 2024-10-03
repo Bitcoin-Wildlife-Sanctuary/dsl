@@ -31,7 +31,7 @@ mod test {
             a_val = c_val;
         }
 
-        cs.set_execution_output(&a).unwrap();
+        cs.set_program_output(&a).unwrap();
 
         test_program(
             cs,

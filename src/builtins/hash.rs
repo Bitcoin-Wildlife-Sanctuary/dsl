@@ -24,7 +24,7 @@ impl BVar for HashVar {
         self.cs.clone()
     }
 
-    fn variable(&self) -> Vec<usize> {
+    fn variables(&self) -> Vec<usize> {
         vec![self.variable]
     }
 
@@ -79,7 +79,7 @@ impl HashVar {
 
 impl<T: BVar> From<&T> for HashVar {
     fn from(v: &T) -> HashVar {
-        let variables = v.variable();
+        let variables = v.variables();
         let cs = v.cs();
 
         let mut cur_hash = Sha256::digest(bitcoin_num_to_bytes(variables.len() as i64)).to_vec();

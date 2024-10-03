@@ -56,7 +56,7 @@ impl ConstraintSystemRef {
         Ok(self.0.borrow().get_str(idx)?.to_vec())
     }
 
-    pub fn set_execution_output(&self, var: &impl BVar) -> Result<()> {
+    pub fn set_program_output(&self, var: &impl BVar) -> Result<()> {
         self.0.borrow_mut().set_program_output(var)
     }
 }
@@ -155,7 +155,7 @@ impl ConstraintSystem {
             return Err(Error::msg("The constraint system has been finalized"));
         }
 
-        let indices = var.variable();
+        let indices = var.variables();
         for &index in indices.iter() {
             if self.memory.get(&index).is_none() {
                 return Err(Error::msg(

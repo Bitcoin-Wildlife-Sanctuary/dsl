@@ -13,7 +13,7 @@ pub trait BVar {
     fn cs(&self) -> ConstraintSystemRef;
 
     /// Returns the assigned stack elements indices.
-    fn variable(&self) -> Vec<usize>;
+    fn variables(&self) -> Vec<usize>;
 
     /// Returns the length (in terms of number of elements in the stack) of the value.
     fn length() -> usize;

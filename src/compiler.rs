@@ -106,9 +106,9 @@ impl Compiler {
                     hint.push(cs.memory.get(idx).unwrap().clone());
                     stack.push_to_stack(*idx)?;
 
-                    script.push(OP_DEPTH.to_u8());
-                    script.push(OP_1SUB.to_u8());
-                    script.push(OP_ROLL.to_u8());
+                    script.push(OP_DEPTH as u8);
+                    script.push(OP_1SUB as u8);
+                    script.push(OP_ROLL as u8);
                 }
                 TraceEntry::SystemOutput(_) => {}
             }

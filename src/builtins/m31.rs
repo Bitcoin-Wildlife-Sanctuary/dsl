@@ -4,7 +4,7 @@ use crate::options::Options;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub struct M31Var {
     pub variable: usize,
@@ -19,7 +19,7 @@ impl BVar for M31Var {
         self.cs.clone()
     }
 
-    fn variable(&self) -> Vec<usize> {
+    fn variables(&self) -> Vec<usize> {
         vec![self.variable]
     }
 
@@ -46,6 +46,26 @@ impl AllocVar for M31Var {
     }
 }
 
+impl Add for &M31Var {
+    type Output = M31Var;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let res = ((self.value as i64) + (rhs.value as i64) % ((1i64 << 31) - 1)) as u32;
+
+        let cs = self.cs.and(&rhs.cs);
+
+        cs.insert_script(
+            m31_add_gadget,
+            [self.variable, rhs.variable],
+            &Options::new(),
+        )
+        .unwrap();
+
+        let res_var = M31Var::new_variable(&cs, res, AllocationMode::FunctionOutput).unwrap();
+        res_var
+    }
+}
+
 impl Mul for &M31Var {
     type Output = M31Var;
 
@@ -66,8 +86,10 @@ impl Mul for &M31Var {
     }
 }
 
+fn m31_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(rust_bitcoin_m31::m31_add())
+}
+
 fn m31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
-        { rust_bitcoin_m31::m31_mul() }
-    })
+    Ok(rust_bitcoin_m31::m31_mul())
 }
