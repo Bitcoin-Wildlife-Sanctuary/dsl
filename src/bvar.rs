@@ -1,11 +1,13 @@
 use crate::constraint_system::ConstraintSystemRef;
 use anyhow::Result;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 /// This trait describes some core functionality that is common to high-level variables.
 pub trait BVar {
     /// The type of the "native" value that `Self` represents in the constraint
     /// system.
-    type Value: core::fmt::Debug + Eq + Clone;
+    type Value: core::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned;
 
     /// Returns the underlying `ConstraintSystemRef`.
     fn cs(&self) -> ConstraintSystemRef;
@@ -23,10 +25,10 @@ pub trait BVar {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AllocationMode {
-    INPUT,
-    OUTPUT,
-    CONSTANT,
-    HINT,
+    ProgramInput,
+    FunctionOutput,
+    Constant,
+    Hint,
 }
 
 pub trait AllocVar: BVar + Sized {
@@ -37,14 +39,18 @@ pub trait AllocVar: BVar + Sized {
     ) -> Result<Self>;
 
     fn new_constant(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
-        Self::new_variable(cs, data, AllocationMode::CONSTANT)
+        Self::new_variable(cs, data, AllocationMode::Constant)
     }
 
-    fn new_input(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
-        Self::new_variable(cs, data, AllocationMode::INPUT)
+    fn new_program_input(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
+        Self::new_variable(cs, data, AllocationMode::ProgramInput)
     }
 
-    fn new_output(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
-        Self::new_variable(cs, data, AllocationMode::OUTPUT)
+    fn new_function_output(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
+        Self::new_variable(cs, data, AllocationMode::FunctionOutput)
+    }
+
+    fn new_hint(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
+        Self::new_variable(cs, data, AllocationMode::Hint)
     }
 }

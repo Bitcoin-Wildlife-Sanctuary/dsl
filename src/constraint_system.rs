@@ -43,8 +43,21 @@ impl ConstraintSystemRef {
             .insert_script(script_generator, input_idxs, options)
     }
 
+    pub fn get_element(&self, idx: usize) -> Result<Element> {
+        let v = self.0.borrow().get_element(idx)?.clone();
+        Ok(v)
+    }
+
+    pub fn get_int(&self, idx: usize) -> Result<i32> {
+        self.0.borrow().get_num(idx)
+    }
+
+    pub fn get_str(&self, idx: usize) -> Result<Vec<u8>> {
+        Ok(self.0.borrow().get_str(idx)?.to_vec())
+    }
+
     pub fn set_execution_output(&self, var: &impl BVar) -> Result<()> {
-        self.0.borrow_mut().set_execution_output(var)
+        self.0.borrow_mut().set_program_output(var)
     }
 }
 
@@ -54,6 +67,7 @@ pub struct ConstraintSystem {
     pub memory_last_idx: usize,
     pub trace: Vec<TraceEntry>,
     pub num_inputs: Option<usize>,
+    pub finalized: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -91,6 +105,7 @@ impl ConstraintSystem {
             memory_last_idx: 0,
             trace: vec![],
             num_inputs: None,
+            finalized: false,
         }
     }
 
@@ -100,7 +115,11 @@ impl ConstraintSystem {
     }
 
     pub fn alloc(&mut self, data: Element, mode: AllocationMode) -> Result<usize> {
-        if mode != AllocationMode::INPUT {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
+        if mode != AllocationMode::ProgramInput {
             if self.num_inputs.is_none() {
                 self.num_inputs = Some(self.memory_last_idx);
             }
@@ -120,18 +139,22 @@ impl ConstraintSystem {
         }
         self.memory.insert(idx, data);
 
-        if mode == AllocationMode::CONSTANT {
+        if mode == AllocationMode::Constant {
             self.trace.push(TraceEntry::DeclareConstant(idx));
-        } else if mode == AllocationMode::HINT {
+        } else if mode == AllocationMode::Hint {
             self.trace.push(TraceEntry::RequestHint(idx));
-        } else if mode == AllocationMode::OUTPUT {
+        } else if mode == AllocationMode::FunctionOutput {
             self.trace.push(TraceEntry::DeclareOutput(idx));
         }
 
         Ok(idx)
     }
 
-    pub fn set_execution_output(&mut self, var: &impl BVar) -> Result<()> {
+    pub fn set_program_output(&mut self, var: &impl BVar) -> Result<()> {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
         let indices = var.variable();
         for &index in indices.iter() {
             if self.memory.get(&index).is_none() {
@@ -144,7 +167,11 @@ impl ConstraintSystem {
         Ok(())
     }
 
-    pub fn get_num(&mut self, idx: usize) -> Result<i32> {
+    pub fn get_num(&self, idx: usize) -> Result<i32> {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
         match self.memory.get(&idx) {
             Some(Element::Num(v)) => Ok(*v),
             _ => Err(Error::msg(
@@ -153,12 +180,27 @@ impl ConstraintSystem {
         }
     }
 
-    pub fn get_str(&mut self, idx: usize) -> Result<&[u8]> {
+    pub fn get_str(&self, idx: usize) -> Result<&[u8]> {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
         match self.memory.get(&idx) {
             Some(Element::Str(v)) => Ok(v.as_slice()),
             _ => Err(Error::msg(
                 "Cannot read the requested data in memory as a string",
             )),
+        }
+    }
+
+    pub fn get_element(&self, idx: usize) -> Result<&Element> {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
+        match self.memory.get(&idx) {
+            Some(v) => Ok(v),
+            _ => Err(Error::msg("Cannot read the requested data in memory")),
         }
     }
 
@@ -168,6 +210,10 @@ impl ConstraintSystem {
         input_idxs: impl IntoIterator<Item = usize>,
         options: &Options,
     ) -> Result<()> {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
         if self.num_inputs.is_none() {
             self.num_inputs = Some(self.memory_last_idx);
         }
@@ -179,5 +225,9 @@ impl ConstraintSystem {
         ));
 
         Ok(())
+    }
+
+    pub fn finalize(&mut self) {
+        self.finalized = true;
     }
 }

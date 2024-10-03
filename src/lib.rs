@@ -6,6 +6,10 @@ use bitcoin::opcodes::OP_TRUE;
 use bitcoin_script::script;
 use bitcoin_scriptexec::{convert_to_witness, execute_script};
 
+pub mod builtins;
+
+pub mod worm;
+
 pub mod bvar;
 
 pub mod constraint_system;
