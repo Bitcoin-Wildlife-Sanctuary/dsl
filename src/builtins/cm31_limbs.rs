@@ -1,16 +1,14 @@
 use crate::builtins::cm31::CM31Var;
-use crate::builtins::m31::M31Var;
 use crate::builtins::m31_limbs::M31LimbsVar;
-use crate::builtins::table::cm31::{CM31Mult, CM31MultGadget};
-use crate::builtins::table::utils::{convert_cm31_from_limbs, mul_cm31};
+use crate::builtins::table::m31::{M31Limbs, M31LimbsGadget};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, BVar};
 use crate::constraint_system::ConstraintSystemRef;
 use crate::options::Options;
 use crate::stack::Stack;
-use crate::treepp::*;
+use crate::treepp::Script;
 use anyhow::Result;
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub struct CM31LimbsVar {
     pub real: M31LimbsVar,
@@ -64,51 +62,79 @@ impl Mul<(&TableVar, &CM31LimbsVar)> for &CM31LimbsVar {
         let table = rhs.0;
         let rhs = rhs.1;
 
-        let cs = self.cs().and(&table.cs()).and(&rhs.cs());
+        let self_sum = &self.real + &self.imag;
+        let rhs_sum = &rhs.real + &rhs.imag;
 
-        let self_cm31 = convert_cm31_from_limbs(&self.value().unwrap());
-        let rhs_cm31 = convert_cm31_from_limbs(&rhs.value().unwrap());
+        let sum_product = &self_sum * (&table, &rhs_sum);
+        let real_product = &self.real * (&table, &rhs.real);
+        let imag_product = &self.imag * (&table, &rhs.imag);
 
-        let res = mul_cm31(self_cm31, rhs_cm31);
+        let new_real = &real_product - &imag_product;
+        let new_imag = &(&sum_product - &real_product) - &imag_product;
 
-        let hint = CM31Mult::compute_hint_from_limbs(
-            &self.real.value,
-            &self.imag.value,
-            &rhs.real.value,
-            &rhs.imag.value,
-        )
-        .unwrap();
-        let hint_vars = [
-            M31Var::new_hint(&cs, hint.q3).unwrap(),
-            M31Var::new_hint(&cs, hint.q2).unwrap(),
-            M31Var::new_hint(&cs, hint.q1).unwrap(),
-        ];
-
-        let options = Options::new().with_u32("table_ref", table.variables[0] as u32);
-        cs.insert_script(
-            cm31_limbs_mul_gadget,
-            hint_vars[0]
-                .variables()
-                .iter()
-                .chain(hint_vars[1].variables().iter())
-                .chain(hint_vars[2].variables().iter())
-                .chain(self.variables().iter())
-                .chain(rhs.variables().iter())
-                .copied(),
-            &options,
-        )
-        .unwrap();
-
-        let res_var = CM31Var::new_function_output(&cs, res).unwrap();
-        res_var
+        CM31Var {
+            real: new_real,
+            imag: new_imag,
+        }
     }
 }
 
-fn cm31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> {
-    let last_table_elem = options.get_u32("table_ref")?;
-    let k = stack.get_relative_position(last_table_elem as usize)? - 512;
+impl Add<&CM31LimbsVar> for &CM31LimbsVar {
+    type Output = CM31LimbsVar;
 
-    Ok(CM31MultGadget::mult(k))
+    fn add(self, rhs: &CM31LimbsVar) -> Self::Output {
+        let new_real_limbs = M31Limbs::add_limbs_with_reduction(&self.real.value, &rhs.real.value);
+        let new_imag_limbs = M31Limbs::add_limbs_with_reduction(&self.imag.value, &rhs.imag.value);
+
+        let cs = self.cs().and(&rhs.cs());
+        cs.insert_script(
+            m31_limbs_add_with_reduction_gadget,
+            self.real
+                .variables()
+                .iter()
+                .chain(rhs.real.variables.iter())
+                .copied(),
+            &Options::new(),
+        )
+        .unwrap();
+        let real = M31LimbsVar::new_function_output(
+            &cs,
+            [
+                new_real_limbs[0],
+                new_real_limbs[1],
+                new_real_limbs[2],
+                new_real_limbs[3],
+            ],
+        )
+        .unwrap();
+
+        cs.insert_script(
+            m31_limbs_add_with_reduction_gadget,
+            self.imag
+                .variables()
+                .iter()
+                .chain(rhs.imag.variables.iter())
+                .copied(),
+            &Options::new(),
+        )
+        .unwrap();
+        let imag = M31LimbsVar::new_function_output(
+            &cs,
+            [
+                new_imag_limbs[0],
+                new_imag_limbs[1],
+                new_imag_limbs[2],
+                new_imag_limbs[3],
+            ],
+        )
+        .unwrap();
+
+        CM31LimbsVar { real, imag }
+    }
+}
+
+fn m31_limbs_add_with_reduction_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(M31LimbsGadget::add_limbs_with_reduction())
 }
 
 #[cfg(test)]

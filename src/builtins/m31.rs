@@ -8,7 +8,7 @@ use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::Ordinary::OP_EQUALVERIFY;
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 
 pub struct M31Var {
     pub variable: usize,
@@ -60,6 +60,27 @@ impl Add for &M31Var {
 
         cs.insert_script(
             m31_add_gadget,
+            [self.variable, rhs.variable],
+            &Options::new(),
+        )
+        .unwrap();
+
+        let res_var = M31Var::new_variable(&cs, res, AllocationMode::FunctionOutput).unwrap();
+        res_var
+    }
+}
+
+impl Sub for &M31Var {
+    type Output = M31Var;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let res = ((self.value as i64) + ((1i64 << 31) - 1)
+            - (rhs.value as i64) % ((1i64 << 31) - 1)) as u32;
+
+        let cs = self.cs.and(&rhs.cs);
+
+        cs.insert_script(
+            m31_sub_gadget,
             [self.variable, rhs.variable],
             &Options::new(),
         )
@@ -153,6 +174,10 @@ impl M31Var {
 
 fn m31_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     Ok(rust_bitcoin_m31::m31_add())
+}
+
+fn m31_sub_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(rust_bitcoin_m31::m31_sub())
 }
 
 fn m31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {

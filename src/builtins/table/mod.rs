@@ -5,7 +5,6 @@ use anyhow::Result;
 use std::ops::Index;
 use std::sync::OnceLock;
 
-pub mod cm31;
 pub mod lookup;
 pub mod m31;
 pub mod utils;

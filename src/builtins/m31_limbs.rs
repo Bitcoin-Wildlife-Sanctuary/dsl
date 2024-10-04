@@ -1,5 +1,5 @@
 use crate::builtins::m31::M31Var;
-use crate::builtins::table::m31::{M31Mult, M31MultGadget};
+use crate::builtins::table::m31::{M31Limbs, M31LimbsGadget, M31Mult, M31MultGadget};
 use crate::builtins::table::utils::{
     check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, pow2147483645, OP_256MUL,
 };
@@ -10,7 +10,7 @@ use crate::options::Options;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub struct M31LimbsVar {
     pub variables: [usize; 4],
@@ -143,6 +143,28 @@ impl M31LimbsVar {
     }
 }
 
+impl Add<&M31LimbsVar> for &M31LimbsVar {
+    type Output = M31LimbsVar;
+
+    fn add(self, rhs: &M31LimbsVar) -> Self::Output {
+        let new_limbs = M31Limbs::add_limbs(&self.value, &rhs.value);
+
+        let cs = self.cs().and(&rhs.cs());
+        cs.insert_script(
+            m31_limbs_add_gadget,
+            self.variables().iter().chain(rhs.variables.iter()).copied(),
+            &Options::new(),
+        )
+        .unwrap();
+
+        M31LimbsVar::new_function_output(
+            &cs,
+            [new_limbs[0], new_limbs[1], new_limbs[2], new_limbs[3]],
+        )
+        .unwrap()
+    }
+}
+
 pub(crate) fn m31_to_limbs_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     // input: m31_var, limb1..4
     Ok(script! {
@@ -181,10 +203,15 @@ fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> 
     })
 }
 
+fn m31_limbs_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(M31LimbsGadget::add_limbs())
+}
+
 #[cfg(test)]
 mod test {
     use crate::builtins::m31::M31Var;
     use crate::builtins::m31_limbs::M31LimbsVar;
+    use crate::builtins::table::m31::M31Limbs;
     use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31, rand_m31};
     use crate::builtins::table::TableVar;
     use crate::bvar::AllocVar;
@@ -283,6 +310,36 @@ mod test {
             cs,
             script! {
                 1
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_m31_limbs_add() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let a_val = rand_m31(&mut prng);
+        let b_val = rand_m31(&mut prng);
+
+        let cs = ConstraintSystem::new_ref();
+
+        let a_var = M31Var::new_constant(&cs, a_val).unwrap();
+        let a_limbs_var = M31LimbsVar::from(&a_var);
+        let b_var = M31Var::new_constant(&cs, b_val).unwrap();
+        let b_limbs_var = M31LimbsVar::from(&b_var);
+
+        let a_limbs = convert_m31_to_limbs(a_val);
+        let b_limbs = convert_m31_to_limbs(b_val);
+        let sum_limbs = M31Limbs::add_limbs(&a_limbs, &b_limbs);
+
+        let sum_limbs_var = &a_limbs_var + &b_limbs_var;
+        cs.set_program_output(&sum_limbs_var).unwrap();
+
+        test_program(
+            cs,
+            script! {
+                { sum_limbs }
             },
         )
         .unwrap();
