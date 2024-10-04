@@ -7,6 +7,7 @@ use crate::options::Options;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
+use bitcoin::opcodes::Ordinary::OP_EQUALVERIFY;
 use std::ops::{Add, Mul};
 
 pub struct M31Var {
@@ -84,8 +85,7 @@ impl Mul for &M31Var {
         )
         .unwrap();
 
-        let res_var = M31Var::new_function_output(&cs, res).unwrap();
-        res_var
+        M31Var::new_function_output(&cs, res).unwrap()
     }
 }
 
@@ -138,6 +138,17 @@ impl M31Var {
 
         inv
     }
+
+    pub fn equalverify(&self, rhs: &Self) -> Result<()> {
+        assert_eq!(self.value, rhs.value);
+
+        let cs = self.cs.and(&rhs.cs());
+        cs.insert_script(
+            m31_equalverify_gadget,
+            [self.variable, rhs.variable],
+            &Options::new(),
+        )
+    }
 }
 
 fn m31_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
@@ -154,22 +165,27 @@ fn m31_is_one_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     })
 }
 
+fn m31_equalverify_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(Script::from(vec![OP_EQUALVERIFY.to_u8()]))
+}
+
 #[cfg(test)]
 mod test {
     use crate::builtins::m31::M31Var;
+    use crate::builtins::table::utils::rand_m31;
     use crate::builtins::table::TableVar;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
     use crate::treepp::*;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_m31_inverse() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
 
         let cs = ConstraintSystem::new_ref();
 
@@ -194,7 +210,7 @@ mod test {
     fn test_m31_inverse_without_table() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
 
         let cs = ConstraintSystem::new_ref();
 

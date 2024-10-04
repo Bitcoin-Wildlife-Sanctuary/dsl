@@ -1,7 +1,27 @@
 use crate::treepp::*;
+use rand::{Rng, RngCore};
 
 pub fn mul_m31(a: u32, b: u32) -> u32 {
     ((a as i64) * (b as i64) % ((1i64 << 31) - 1)) as u32
+}
+
+pub fn mul_cm31(a: (u32, u32), b: (u32, u32)) -> (u32, u32) {
+    let a_real = a.0;
+    let a_imag = a.1;
+
+    let b_real = b.0;
+    let b_imag = b.1;
+
+    let mut c_real = mul_m31(a_real, b_real) as i64;
+    c_real += (1i64 << 31) - 1;
+    c_real -= mul_m31(a_imag, b_imag) as i64;
+    c_real %= (1i64 << 31) - 1;
+
+    let mut c_imag = mul_m31(a_real, b_imag) as i64;
+    c_imag += mul_m31(a_imag, b_real) as i64;
+    c_imag %= (1i64 << 31) - 1;
+
+    (c_real as u32, c_imag as u32)
 }
 
 pub fn convert_m31_to_limbs(v: u32) -> [u32; 4] {
@@ -28,9 +48,17 @@ pub fn convert_cm31_to_limbs(cm31: (u32, u32)) -> [u32; 8] {
     ]
 }
 
-pub fn convert_cm31_from_limbs(v: &[u32]) -> (u32, u32) {
-    let real = convert_m31_from_limbs(&v[0..4]);
-    let imag = convert_m31_from_limbs(&v[4..8]);
+pub fn rand_m31<R: RngCore>(prng: &mut R) -> u32 {
+    prng.gen_range(0..((1i64 << 31) - 1)) as u32
+}
+
+pub fn rand_cm31<R: RngCore>(prng: &mut R) -> (u32, u32) {
+    (rand_m31(prng), rand_m31(prng))
+}
+
+pub fn convert_cm31_from_limbs(v: &([u32; 4], [u32; 4])) -> (u32, u32) {
+    let real = convert_m31_from_limbs(&v.0);
+    let imag = convert_m31_from_limbs(&v.1);
     (real, imag)
 }
 

@@ -185,20 +185,20 @@ fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> 
 mod test {
     use crate::builtins::m31::M31Var;
     use crate::builtins::m31_limbs::M31LimbsVar;
-    use crate::builtins::table::utils::convert_m31_to_limbs;
+    use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31, rand_m31};
     use crate::builtins::table::TableVar;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
     use crate::treepp::*;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_m31_to_limbs() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
 
         let cs = ConstraintSystem::new_ref();
 
@@ -220,7 +220,7 @@ mod test {
     fn test_m31_limbs_equalverify() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
         let cs = ConstraintSystem::new_ref();
 
         let a = M31Var::new_constant(&cs, a_val).unwrap();
@@ -236,8 +236,8 @@ mod test {
     fn test_m31_limbs_table_mul() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
-        let b_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
+        let b_val = rand_m31(&mut prng);
         let cs = ConstraintSystem::new_ref();
 
         let a = M31Var::new_constant(&cs, a_val).unwrap();
@@ -254,7 +254,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ((a_val as i64) * (b_val as i64) % ((1i64 << 31) - 1)) as u32 }
+                { mul_m31(a_val, b_val) }
             },
         )
         .unwrap();
@@ -264,7 +264,7 @@ mod test {
     fn test_m31_limbs_inverse() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
 
         let cs = ConstraintSystem::new_ref();
 

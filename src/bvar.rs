@@ -1,4 +1,7 @@
 use crate::constraint_system::ConstraintSystemRef;
+use crate::options::Options;
+use crate::stack::Stack;
+use crate::treepp::*;
 use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -53,4 +56,14 @@ pub trait AllocVar: BVar + Sized {
     fn new_hint(cs: &ConstraintSystemRef, data: <Self as BVar>::Value) -> Result<Self> {
         Self::new_variable(cs, data, AllocationMode::Hint)
     }
+
+    fn clone(&self) -> Result<Self> {
+        let cs = self.cs();
+        cs.insert_script(dummy_script, self.variables(), &Options::new())?;
+        Self::new_function_output(&cs, self.value()?)
+    }
+}
+
+fn dummy_script(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(script! {})
 }

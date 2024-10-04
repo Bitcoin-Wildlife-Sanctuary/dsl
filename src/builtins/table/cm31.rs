@@ -1,5 +1,5 @@
 use crate::builtins::table::m31::{M31Limbs, M31LimbsGadget, M31Mult, M31MultGadget};
-use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31};
+use crate::builtins::table::utils::convert_m31_to_limbs;
 use crate::treepp::pushable::{Builder, Pushable};
 use crate::treepp::*;
 use anyhow::Result;
@@ -175,32 +175,11 @@ impl CM31LimbsGadget {
     }
 }
 
-pub fn mul_cm31(a: (u32, u32), b: (u32, u32)) -> (u32, u32) {
-    let a_real = a.0;
-    let a_imag = a.1;
-
-    let b_real = b.0;
-    let b_imag = b.1;
-
-    let mut c_real = mul_m31(a_real, b_real) as i64;
-    c_real += (1i64 << 31) - 1;
-    c_real -= mul_m31(a_imag, b_imag) as i64;
-    c_real %= (1i64 << 31) - 1;
-
-    let mut c_imag = mul_m31(a_real, b_imag) as i64;
-    c_imag += mul_m31(a_imag, b_real) as i64;
-    c_imag %= (1i64 << 31) - 1;
-
-    (c_real as u32, c_imag as u32)
-}
-
 #[cfg(test)]
 mod test {
-    use crate::builtins::table::cm31::{
-        mul_cm31, CM31Limbs, CM31LimbsGadget, CM31Mult, CM31MultGadget,
-    };
+    use crate::builtins::table::cm31::{CM31Limbs, CM31LimbsGadget, CM31Mult, CM31MultGadget};
     use crate::builtins::table::get_table;
-    use crate::builtins::table::utils::{convert_cm31_to_limbs, convert_m31_to_limbs};
+    use crate::builtins::table::utils::{convert_cm31_to_limbs, convert_m31_to_limbs, mul_cm31};
     use crate::treepp::*;
     use bitcoin_scriptexec::execute_script;
     use rand::{Rng, SeedableRng};
