@@ -100,9 +100,9 @@ impl Mul<(&TableVar, &M31LimbsVar)> for &M31LimbsVar {
         let options = Options::new().with_u32("table_ref", table.variables[0] as u32);
         cs.insert_script(
             m31_limbs_mul_gadget,
-            self.variables
+            self.variables()
                 .iter()
-                .chain(rhs.variables.iter())
+                .chain(rhs.variables().iter())
                 .chain(q_var.variables().iter())
                 .copied(),
             &options,
@@ -176,6 +176,7 @@ fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> 
     Ok(script! {
         OP_TOALTSTACK
         { M31MultGadget::compute_c_limbs(k) }
+        OP_FROMALTSTACK
         { M31MultGadget::reduce() }
     })
 }

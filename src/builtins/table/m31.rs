@@ -248,8 +248,10 @@ impl M31MultGadget {
     pub fn reduce() -> Script {
         // Input:
         //   c4, c3, c2, c1
+        //   h
 
         script! {
+            OP_TOALTSTACK
             3 OP_ROLL
 
             // pull q and save a copy in the altstack
@@ -411,7 +413,7 @@ impl M31LimbsGadget {
 mod test {
     use crate::builtins::table::get_table;
     use crate::builtins::table::m31::{M31Limbs, M31Mult, M31MultGadget};
-    use crate::builtins::table::utils::convert_m31_to_limbs;
+    use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31};
     use crate::treepp::*;
     use bitcoin_script::script;
     use bitcoin_scriptexec::execute_script;
@@ -497,13 +499,13 @@ mod test {
 
             let c_limbs = M31Mult::compute_c_limbs(a, b).unwrap();
             let q = M31Mult::compute_q(&c_limbs).unwrap();
-            let r = (a as i64) * (b as i64) % ((1 << 31) - 1);
+            let r = mul_m31(a, b);
 
             let script = script! {
-                { q } OP_TOALTSTACK
                 for c_limb in c_limbs.iter().rev() {
                     { *c_limb }
                 }
+                { q }
                 { M31MultGadget::reduce() }
                 { r }
                 OP_EQUAL

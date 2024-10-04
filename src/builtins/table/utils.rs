@@ -1,11 +1,37 @@
 use crate::treepp::*;
 
+pub fn mul_m31(a: u32, b: u32) -> u32 {
+    ((a as i64) * (b as i64) % ((1i64 << 31) - 1)) as u32
+}
+
 pub fn convert_m31_to_limbs(v: u32) -> [u32; 4] {
     [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]
 }
 
 pub fn convert_m31_from_limbs(v: &[u32]) -> u32 {
     v[0] + (v[1] << 8) + (v[2] << 16) + (v[3] << 24)
+}
+
+pub fn convert_cm31_to_limbs(cm31: (u32, u32)) -> [u32; 8] {
+    let real_limbs = convert_m31_to_limbs(cm31.0);
+    let imag_limbs = convert_m31_to_limbs(cm31.1);
+
+    [
+        real_limbs[0],
+        real_limbs[1],
+        real_limbs[2],
+        real_limbs[3],
+        imag_limbs[0],
+        imag_limbs[1],
+        imag_limbs[2],
+        imag_limbs[3],
+    ]
+}
+
+pub fn convert_cm31_from_limbs(v: &[u32]) -> (u32, u32) {
+    let real = convert_m31_from_limbs(&v[0..4]);
+    let imag = convert_m31_from_limbs(&v[4..8]);
+    (real, imag)
 }
 
 pub fn check_limb_format() -> Script {
