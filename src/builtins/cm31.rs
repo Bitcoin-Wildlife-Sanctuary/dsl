@@ -8,6 +8,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::FieldExpOps;
 
+#[derive(Clone)]
 pub struct CM31Var {
     pub imag: M31Var,
     pub real: M31Var,
@@ -61,7 +62,7 @@ impl Add<&M31Var> for &CM31Var {
     type Output = CM31Var;
 
     fn add(self, rhs: &M31Var) -> Self::Output {
-        let imag = self.imag.clone().unwrap();
+        let imag = self.imag.copy().unwrap();
         let real = &self.real + rhs;
 
         CM31Var { imag, real }
@@ -83,7 +84,7 @@ impl Sub<&M31Var> for &CM31Var {
     type Output = CM31Var;
 
     fn sub(self, rhs: &M31Var) -> Self::Output {
-        let imag = self.imag.clone().unwrap();
+        let imag = self.imag.copy().unwrap();
         let real = &self.real - rhs;
 
         CM31Var { imag, real }
@@ -170,7 +171,7 @@ impl CM31Var {
     }
 
     pub fn shift_by_i(&self) -> Self {
-        let imag = self.real.clone().unwrap();
+        let imag = self.real.copy().unwrap();
         let real = -&self.imag;
 
         Self { imag, real }

@@ -14,6 +14,7 @@ use std::ops::{Add, Mul};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
 
+#[derive(Clone)]
 pub struct M31LimbsVar {
     pub variables: [usize; 4],
     pub value: [u32; 4],

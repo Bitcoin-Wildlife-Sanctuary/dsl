@@ -50,6 +50,7 @@ pub fn get_table() -> &'static Table {
     TABLE.get_or_init(|| generate_table::<9>())
 }
 
+#[derive(Clone)]
 pub struct TableVar {
     pub variables: Vec<usize>,
     pub cs: ConstraintSystemRef,

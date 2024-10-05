@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 /// This trait describes some core functionality that is common to high-level variables.
-pub trait BVar {
+pub trait BVar: Clone {
     /// The type of the "native" value that `Self` represents in the constraint
     /// system.
     type Value: core::fmt::Debug + Eq + Clone + Serialize + DeserializeOwned;
@@ -70,7 +70,7 @@ pub trait AllocVar: BVar + Sized {
         Self::new_variable(cs, data, AllocationMode::Hint)
     }
 
-    fn clone(&self) -> Result<Self> {
+    fn copy(&self) -> Result<Self> {
         let cs = self.cs();
         cs.insert_script(dummy_script, self.variables())?;
         Self::new_function_output(&cs, self.value()?)

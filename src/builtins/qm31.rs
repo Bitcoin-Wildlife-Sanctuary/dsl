@@ -13,6 +13,7 @@ use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::qm31::QM31;
 use stwo_prover::core::fields::FieldExpOps;
 
+#[derive(Clone)]
 pub struct QM31Var {
     pub first: CM31Var,
     pub second: CM31Var,
@@ -71,7 +72,7 @@ impl Add<&CM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn add(self, rhs: &CM31Var) -> Self::Output {
-        let second = self.second.clone().unwrap();
+        let second = self.second.copy().unwrap();
         let first = &self.first + rhs;
 
         QM31Var { first, second }
@@ -82,7 +83,7 @@ impl Add<&M31Var> for QM31Var {
     type Output = QM31Var;
 
     fn add(self, rhs: &M31Var) -> Self::Output {
-        let second = self.second.clone().unwrap();
+        let second = self.second.copy().unwrap();
         let first = &self.first + rhs;
 
         QM31Var { first, second }
@@ -104,7 +105,7 @@ impl Sub<&CM31Var> for &QM31Var {
     type Output = QM31Var;
 
     fn sub(self, rhs: &CM31Var) -> Self::Output {
-        let second = self.second.clone().unwrap();
+        let second = self.second.copy().unwrap();
         let first = &self.first - rhs;
 
         QM31Var { first, second }
@@ -115,7 +116,7 @@ impl Sub<&M31Var> for QM31Var {
     type Output = QM31Var;
 
     fn sub(self, rhs: &M31Var) -> Self::Output {
-        let second = self.second.clone().unwrap();
+        let second = self.second.copy().unwrap();
         let first = &self.first - rhs;
 
         QM31Var { first, second }
@@ -203,7 +204,7 @@ impl QM31Var {
     }
 
     pub fn shift_by_j(&self) -> QM31Var {
-        let first = self.second.clone().unwrap();
+        let first = self.second.copy().unwrap();
         let mut second = &self.first + &self.first;
         second.real = &second.real + &self.first.imag;
         second.imag = &second.imag - &self.first.real;

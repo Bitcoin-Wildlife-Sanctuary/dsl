@@ -7,6 +7,7 @@ use bitcoin::opcodes::all::OP_CAT;
 use bitcoin_circle_stark::treepp::*;
 use std::ops::Add;
 
+#[derive(Clone)]
 pub struct StrVar {
     pub variable: usize,
     pub value: Vec<u8>,

@@ -10,7 +10,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct M31Var {
     pub variable: usize,
     pub value: M31,

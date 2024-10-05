@@ -6,6 +6,7 @@ use crate::constraint_system::ConstraintSystemRef;
 use anyhow::Result;
 use std::ops::Mul;
 
+#[derive(Clone)]
 pub struct QM31LimbsVar {
     pub first: CM31LimbsVar,
     pub second: CM31LimbsVar,

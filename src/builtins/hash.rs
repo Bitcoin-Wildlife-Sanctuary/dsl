@@ -14,6 +14,7 @@ use sha2::digest::Update;
 use sha2::{Digest, Sha256};
 use std::ops::Add;
 
+#[derive(Clone)]
 pub struct HashVar {
     pub variable: usize,
     pub value: Vec<u8>,

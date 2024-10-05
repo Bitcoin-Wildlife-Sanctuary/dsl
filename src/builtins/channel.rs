@@ -72,33 +72,14 @@ impl HashVar {
 
     pub fn draw_felt(&mut self) -> QM31Var {
         let m31 = self.draw_many_m31(4);
-        let cs = self.cs();
-
-        // perform a move operation
         let qm31 = QM31Var {
             first: CM31Var {
-                imag: M31Var {
-                    variable: m31[1].variable,
-                    value: m31[1].value,
-                    cs: cs.clone(),
-                },
-                real: M31Var {
-                    variable: m31[0].variable,
-                    value: m31[0].value,
-                    cs: cs.clone(),
-                },
+                imag: m31[1].clone(),
+                real: m31[0].clone(),
             },
             second: CM31Var {
-                imag: M31Var {
-                    variable: m31[3].variable,
-                    value: m31[3].value,
-                    cs: cs.clone(),
-                },
-                real: M31Var {
-                    variable: m31[2].variable,
-                    value: m31[2].value,
-                    cs: cs.clone(),
-                },
+                imag: m31[3].clone(),
+                real: m31[2].clone(),
             },
         };
 
