@@ -35,8 +35,9 @@
 
 use crate::builtins::table::lookup::Lookup8BitGadget;
 use crate::builtins::table::utils::{convert_m31_to_limbs, OP_256MUL};
-use crate::treepp::*;
 use anyhow::{Error, Result};
+use bitcoin_circle_stark::treepp::*;
+use stwo_prover::core::fields::m31::M31;
 
 pub struct M31Mult;
 
@@ -82,7 +83,7 @@ impl M31Mult {
         Ok(c_limbs)
     }
 
-    pub fn compute_c_limbs(a: u32, b: u32) -> Result<[u32; 4]> {
+    pub fn compute_c_limbs(a: M31, b: M31) -> Result<[u32; 4]> {
         let a_limbs = convert_m31_to_limbs(a);
         let b_limbs = convert_m31_to_limbs(b);
 
@@ -413,11 +414,11 @@ impl M31LimbsGadget {
 mod test {
     use crate::builtins::table::get_table;
     use crate::builtins::table::m31::{M31Limbs, M31Mult, M31MultGadget};
-    use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31};
-    use crate::treepp::*;
+    use crate::builtins::table::utils::{convert_m31_to_limbs, rand_m31};
+    use bitcoin_circle_stark::treepp::*;
     use bitcoin_script::script;
     use bitcoin_scriptexec::execute_script;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
@@ -425,13 +426,13 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         for _ in 0..1 {
-            let a = prng.gen_range(0u32..((1 << 31) - 1));
-            let b = prng.gen_range(0u32..((1 << 31) - 1));
+            let a = rand_m31(&mut prng);
+            let b = rand_m31(&mut prng);
 
             let c_limbs = M31Mult::compute_c_limbs(a, b).unwrap();
             let q = M31Mult::compute_q(&c_limbs).unwrap();
 
-            let expected = (a as i64) * (b as i64) % ((1 << 31) - 1);
+            let expected = a * b;
 
             let mut t = c_limbs[3] as i32;
             t = t.checked_sub((q as i32).checked_shl(7).unwrap()).unwrap();
@@ -443,7 +444,7 @@ mod test {
             t = t.checked_add(q as i32).unwrap();
             t = t.checked_add(c_limbs[0] as i32).unwrap();
 
-            assert_eq!(t as i64, expected);
+            assert_eq!(t as u32, expected.0);
         }
     }
 
@@ -454,8 +455,8 @@ mod test {
         let table = get_table();
 
         for i in 0..100 {
-            let a = prng.gen_range(0u32..((1 << 31) - 1));
-            let b = prng.gen_range(0u32..((1 << 31) - 1));
+            let a = rand_m31(&mut prng);
+            let b = rand_m31(&mut prng);
 
             let a_limbs = convert_m31_to_limbs(a);
             let b_limbs = convert_m31_to_limbs(b);
@@ -494,12 +495,12 @@ mod test {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         for _ in 0..100 {
-            let a = prng.gen_range(0u32..((1 << 31) - 1));
-            let b = prng.gen_range(0u32..((1 << 31) - 1));
+            let a = rand_m31(&mut prng);
+            let b = rand_m31(&mut prng);
 
             let c_limbs = M31Mult::compute_c_limbs(a, b).unwrap();
             let q = M31Mult::compute_q(&c_limbs).unwrap();
-            let r = mul_m31(a, b);
+            let r = a * b;
 
             let script = script! {
                 for c_limb in c_limbs.iter().rev() {
@@ -507,7 +508,7 @@ mod test {
                 }
                 { q }
                 { M31MultGadget::reduce() }
-                { r }
+                { r.0 }
                 OP_EQUAL
             };
 
@@ -520,14 +521,14 @@ mod test {
     fn test_add_limbs() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a = prng.gen_range(0u32..((1 << 31) - 1));
-        let b = prng.gen_range(0u32..((1 << 31) - 1));
+        let a = rand_m31(&mut prng);
+        let b = rand_m31(&mut prng);
 
         let a_limbs = convert_m31_to_limbs(a);
         let b_limbs = convert_m31_to_limbs(b);
 
-        let d = prng.gen_range(0u32..((1 << 31) - 1));
-        let e = prng.gen_range(0u32..((1 << 31) - 1));
+        let d = rand_m31(&mut prng);
+        let e = rand_m31(&mut prng);
 
         let d_limbs = convert_m31_to_limbs(d);
         let e_limbs = convert_m31_to_limbs(e);

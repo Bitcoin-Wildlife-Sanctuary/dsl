@@ -1,16 +1,17 @@
 use crate::builtins::cm31::CM31Var;
 use crate::builtins::m31::M31Var;
 use crate::builtins::qm31_limbs::QM31LimbsVar;
-use crate::builtins::table::utils::{add_m31, inverse_qm31, mul_qm31, sub_m31};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::ConstraintSystemRef;
-use crate::options::Options;
-use crate::stack::Stack;
-use crate::treepp::*;
 use anyhow::Result;
+use bitcoin_circle_stark::treepp::*;
+use num_traits::One;
 use rust_bitcoin_m31::{m31_add_n31, m31_sub, push_m31_one, push_n31_one, qm31_swap};
 use std::ops::{Add, Mul, Neg, Sub};
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::qm31::QM31;
+use stwo_prover::core::fields::FieldExpOps;
 
 pub struct QM31Var {
     pub first: CM31Var,
@@ -18,7 +19,7 @@ pub struct QM31Var {
 }
 
 impl BVar for QM31Var {
-    type Value = ((u32, u32), (u32, u32));
+    type Value = QM31;
 
     fn cs(&self) -> ConstraintSystemRef {
         self.first.cs().and(&self.second.cs())
@@ -38,7 +39,7 @@ impl BVar for QM31Var {
     }
 
     fn value(&self) -> Result<Self::Value> {
-        Ok((self.first.value()?, self.second.value()?))
+        Ok(QM31(self.first.value()?, self.second.value()?))
     }
 }
 
@@ -138,16 +139,15 @@ impl Mul for &QM31Var {
     type Output = QM31Var;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let res = mul_qm31(self.value().unwrap(), rhs.value().unwrap());
+        let res = self.value().unwrap() * rhs.value().unwrap();
         let cs = self.cs().and(&rhs.cs());
 
         cs.insert_script(
-            qm31_mult_gadget,
+            rust_bitcoin_m31::qm31_mul,
             self.variables()
                 .iter()
                 .chain(rhs.variables().iter())
                 .copied(),
-            &Options::new(),
         )
         .unwrap();
 
@@ -168,17 +168,17 @@ impl Neg for &QM31Var {
 
 impl QM31Var {
     pub fn is_one(&self) {
-        assert_eq!(self.value().unwrap(), ((1, 0), (0, 0)));
+        assert_eq!(self.value().unwrap(), QM31::from_u32_unchecked(1, 0, 0, 0));
         self.first.is_one();
         self.second.is_zero();
     }
 
     pub fn add1(&self) -> QM31Var {
         let mut res = self.value().unwrap();
-        res.0 .0 = add_m31(res.0 .0, 1);
+        res.0 .0 = res.0 .0 + M31::one();
         let cs = self.cs();
 
-        cs.insert_script(qm31_1add_gadget, self.variables(), &Options::new())
+        cs.insert_script(qm31_1add_gadget, self.variables())
             .unwrap();
 
         QM31Var::new_function_output(&cs, res).unwrap()
@@ -186,10 +186,10 @@ impl QM31Var {
 
     pub fn sub1(&self) -> QM31Var {
         let mut res = self.value().unwrap();
-        res.0 .0 = sub_m31(res.0 .0, 1);
+        res.0 .0 = res.0 .0 - M31::one();
         let cs = self.cs();
 
-        cs.insert_script(qm31_1sub_gadget, self.variables(), &Options::new())
+        cs.insert_script(qm31_1sub_gadget, self.variables())
             .unwrap();
 
         QM31Var::new_function_output(&cs, res).unwrap()
@@ -217,7 +217,7 @@ impl QM31Var {
 
     pub fn inverse(&self, table: &TableVar) -> QM31Var {
         let cs = self.cs();
-        let res = inverse_qm31(self.value().unwrap());
+        let res = self.value().unwrap().inverse();
 
         let res_var = QM31Var::new_hint(&cs, res).unwrap();
         let expected_one = &res_var * (table, self);
@@ -228,7 +228,7 @@ impl QM31Var {
 
     pub fn inverse_without_table(&self) -> QM31Var {
         let cs = self.cs();
-        let res = inverse_qm31(self.value().unwrap());
+        let res = self.value().unwrap().inverse();
 
         let res_var = QM31Var::new_hint(&cs, res).unwrap();
         let expected_one = &res_var * self;
@@ -238,9 +238,9 @@ impl QM31Var {
     }
 
     pub fn conditional_swap(&self, rhs: &QM31Var, bit: &M31Var) -> (QM31Var, QM31Var) {
-        assert!(bit.value == 0 || bit.value == 1);
+        assert!(bit.value.0 == 0 || bit.value.0 == 1);
 
-        let res = if bit.value == 0 {
+        let res = if bit.value.0 == 0 {
             (self.value().unwrap(), rhs.value().unwrap())
         } else {
             (rhs.value().unwrap(), self.value().unwrap())
@@ -255,7 +255,6 @@ impl QM31Var {
                 .chain(rhs.variables().iter())
                 .chain(bit.variables().iter())
                 .copied(),
-            &Options::new(),
         )
         .unwrap();
 
@@ -266,30 +265,26 @@ impl QM31Var {
     }
 }
 
-fn qm31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(rust_bitcoin_m31::qm31_mul())
-}
-
-fn qm31_1add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
+fn qm31_1add_gadget() -> Script {
+    script! {
         push_n31_one
         m31_add_n31
-    })
+    }
 }
 
-fn qm31_1sub_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
+fn qm31_1sub_gadget() -> Script {
+    script! {
         push_m31_one
         m31_sub
-    })
+    }
 }
 
-fn qm31_conditional_swap_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
+fn qm31_conditional_swap_gadget() -> Script {
+    script! {
         OP_IF
             qm31_swap
         OP_ENDIF
-    })
+    }
 }
 
 #[cfg(test)]
@@ -300,7 +295,7 @@ mod test {
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 

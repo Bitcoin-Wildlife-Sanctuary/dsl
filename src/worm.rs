@@ -142,8 +142,8 @@ mod test {
     use crate::bvar::{AllocVar, BVar};
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
     use crate::worm::WORMMemory;
+    use bitcoin_circle_stark::treepp::*;
     use bitcoin_script::script;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;

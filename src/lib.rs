@@ -1,9 +1,8 @@
 use crate::compiler::Compiler;
 use crate::constraint_system::ConstraintSystemRef;
-use crate::treepp::Script;
 use anyhow::{Error, Result};
 use bitcoin::opcodes::OP_TRUE;
-use bitcoin_script::script;
+use bitcoin_circle_stark::treepp::*;
 use bitcoin_scriptexec::{convert_to_witness, execute_script};
 
 pub mod builtins;
@@ -22,14 +21,7 @@ pub mod compiler;
 
 pub mod options;
 
-pub(crate) mod treepp {
-    pub use bitcoin_script::{define_pushable, script};
-
-    define_pushable!();
-    pub use bitcoin::ScriptBuf as Script;
-}
-
-use crate::treepp::*;
+pub mod script_generator;
 
 pub fn test_program(cs: ConstraintSystemRef, expected_stack: Script) -> Result<()> {
     let program = Compiler::compile(cs)?;

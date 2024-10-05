@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod test {
     use crate::builtins::m31::M31Var;
-    use crate::builtins::table::utils::{mul_m31, rand_m31};
+    use crate::builtins::table::utils::rand_m31;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
@@ -25,7 +25,7 @@ mod test {
             let b = M31Var::new_constant(&cs, b_val).unwrap();
 
             let c = &a * &b;
-            let c_val = mul_m31(a_val, b_val);
+            let c_val = a_val * b_val;
             assert_eq!(c.value, c_val);
 
             a = c;
@@ -37,7 +37,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { a_val }
+                { a_val.0 }
             },
         )
         .unwrap();

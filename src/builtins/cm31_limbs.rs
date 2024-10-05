@@ -4,9 +4,6 @@ use crate::builtins::table::m31::{M31Limbs, M31LimbsGadget};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, BVar};
 use crate::constraint_system::ConstraintSystemRef;
-use crate::options::Options;
-use crate::stack::Stack;
-use crate::treepp::Script;
 use anyhow::Result;
 use std::ops::{Add, Mul};
 
@@ -79,13 +76,12 @@ impl Add<&CM31LimbsVar> for &CM31LimbsVar {
 
         let cs = self.cs().and(&rhs.cs());
         cs.insert_script(
-            m31_limbs_add_with_reduction_gadget,
+            M31LimbsGadget::add_limbs_with_reduction,
             self.real
                 .variables()
                 .iter()
                 .chain(rhs.real.variables.iter())
                 .copied(),
-            &Options::new(),
         )
         .unwrap();
         let real = M31LimbsVar::new_function_output(
@@ -100,13 +96,12 @@ impl Add<&CM31LimbsVar> for &CM31LimbsVar {
         .unwrap();
 
         cs.insert_script(
-            m31_limbs_add_with_reduction_gadget,
+            M31LimbsGadget::add_limbs_with_reduction,
             self.imag
                 .variables()
                 .iter()
                 .chain(rhs.imag.variables.iter())
                 .copied(),
-            &Options::new(),
         )
         .unwrap();
         let imag = M31LimbsVar::new_function_output(
@@ -124,20 +119,16 @@ impl Add<&CM31LimbsVar> for &CM31LimbsVar {
     }
 }
 
-fn m31_limbs_add_with_reduction_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(M31LimbsGadget::add_limbs_with_reduction())
-}
-
 #[cfg(test)]
 mod test {
     use crate::builtins::cm31::CM31Var;
     use crate::builtins::cm31_limbs::CM31LimbsVar;
-    use crate::builtins::table::utils::{mul_cm31, rand_cm31};
+    use crate::builtins::table::utils::rand_cm31;
     use crate::builtins::table::TableVar;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
@@ -147,7 +138,7 @@ mod test {
 
         let a_val = rand_cm31(&mut prng);
         let b_val = rand_cm31(&mut prng);
-        let expected = mul_cm31(a_val, b_val);
+        let expected = a_val * b_val;
 
         let cs = ConstraintSystem::new_ref();
 

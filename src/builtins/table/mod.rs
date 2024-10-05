@@ -1,7 +1,7 @@
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
-use crate::treepp::pushable::{Builder, Pushable};
 use anyhow::Result;
+use bitcoin_circle_stark::treepp::pushable::{Builder, Pushable};
 use std::ops::Index;
 use std::sync::OnceLock;
 

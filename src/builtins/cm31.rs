@@ -1,14 +1,12 @@
 use crate::builtins::cm31_limbs::CM31LimbsVar;
 use crate::builtins::m31::M31Var;
-use crate::builtins::table::utils::{inverse_cm31, mul_cm31};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::ConstraintSystemRef;
-use crate::options::Options;
-use crate::stack::Stack;
-use crate::treepp::Script;
 use anyhow::Result;
 use std::ops::{Add, Mul, Neg, Sub};
+use stwo_prover::core::fields::cm31::CM31;
+use stwo_prover::core::fields::FieldExpOps;
 
 pub struct CM31Var {
     pub imag: M31Var,
@@ -16,7 +14,7 @@ pub struct CM31Var {
 }
 
 impl BVar for CM31Var {
-    type Value = (u32, u32);
+    type Value = CM31;
 
     fn cs(&self) -> ConstraintSystemRef {
         self.real.cs.and(&self.imag.cs)
@@ -31,7 +29,7 @@ impl BVar for CM31Var {
     }
 
     fn value(&self) -> Result<Self::Value> {
-        Ok((self.real.value, self.imag.value))
+        Ok(CM31::from_m31(self.real.value, self.imag.value))
     }
 }
 
@@ -96,16 +94,15 @@ impl Mul for &CM31Var {
     type Output = CM31Var;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let res = mul_cm31(self.value().unwrap(), rhs.value().unwrap());
+        let res = self.value().unwrap() * rhs.value().unwrap();
         let cs = self.cs().and(&rhs.cs());
 
         cs.insert_script(
-            cm31_mult_gadget,
+            rust_bitcoin_m31::cm31_mul,
             self.variables()
                 .iter()
                 .chain(rhs.variables().iter())
                 .copied(),
-            &Options::new(),
         )
         .unwrap();
 
@@ -139,20 +136,20 @@ impl Neg for &CM31Var {
 
 impl CM31Var {
     pub fn is_one(&self) {
-        assert_eq!(self.value().unwrap(), (1, 0));
+        assert_eq!(self.value().unwrap(), CM31::from_u32_unchecked(1, 0));
         self.real.is_one();
         self.imag.is_zero();
     }
 
     pub fn is_zero(&self) {
-        assert_eq!(self.value().unwrap(), (0, 0));
+        assert_eq!(self.value().unwrap(), CM31::from_u32_unchecked(0, 0));
         self.real.is_zero();
         self.imag.is_zero();
     }
 
     pub fn inverse(&self, table: &TableVar) -> Self {
         let cs = self.cs();
-        let res = inverse_cm31(self.value().unwrap());
+        let res = self.value().unwrap().inverse();
 
         let res_var = CM31Var::new_hint(&cs, res).unwrap();
         let expected_one = &res_var * (table, self);
@@ -163,7 +160,7 @@ impl CM31Var {
 
     pub fn inverse_without_table(&self) -> Self {
         let cs = self.cs();
-        let res = inverse_cm31(self.value().unwrap());
+        let res = self.value().unwrap().inverse();
 
         let res_var = CM31Var::new_hint(&cs, res).unwrap();
         let expected_one = &res_var * self;
@@ -180,10 +177,6 @@ impl CM31Var {
     }
 }
 
-fn cm31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(rust_bitcoin_m31::cm31_mul())
-}
-
 #[cfg(test)]
 mod test {
     use crate::builtins::cm31::CM31Var;
@@ -192,7 +185,7 @@ mod test {
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 

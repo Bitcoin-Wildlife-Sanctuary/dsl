@@ -1,22 +1,22 @@
 use crate::builtins::m31_limbs::{m31_to_limbs_gadget, M31LimbsVar};
-use crate::builtins::table::utils::{add_m31, mul_m31, pow2147483645, sub_m31};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
-use crate::options::Options;
-use crate::stack::Stack;
-use crate::treepp::*;
 use anyhow::Result;
+use bitcoin_circle_stark::treepp::*;
 use std::ops::{Add, Mul, Neg, Sub};
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::FieldExpOps;
 
+#[derive(Debug)]
 pub struct M31Var {
     pub variable: usize,
-    pub value: u32,
+    pub value: M31,
     pub cs: ConstraintSystemRef,
 }
 
 impl BVar for M31Var {
-    type Value = u32;
+    type Value = M31;
 
     fn cs(&self) -> ConstraintSystemRef {
         self.cs.clone()
@@ -42,7 +42,7 @@ impl AllocVar for M31Var {
         mode: AllocationMode,
     ) -> Result<Self> {
         Ok(Self {
-            variable: cs.alloc(Element::Num(data as i32), mode)?,
+            variable: cs.alloc(Element::Num(data.0 as i32), mode)?,
             value: data,
             cs: cs.clone(),
         })
@@ -53,16 +53,12 @@ impl Add for &M31Var {
     type Output = M31Var;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let res = add_m31(self.value, rhs.value);
+        let res = self.value + rhs.value;
 
         let cs = self.cs.and(&rhs.cs);
 
-        cs.insert_script(
-            m31_add_gadget,
-            [self.variable, rhs.variable],
-            &Options::new(),
-        )
-        .unwrap();
+        cs.insert_script(rust_bitcoin_m31::m31_add, [self.variable, rhs.variable])
+            .unwrap();
 
         let res_var = M31Var::new_variable(&cs, res, AllocationMode::FunctionOutput).unwrap();
         res_var
@@ -73,16 +69,12 @@ impl Sub for &M31Var {
     type Output = M31Var;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let res = sub_m31(self.value, rhs.value);
+        let res = self.value - rhs.value;
 
         let cs = self.cs.and(&rhs.cs);
 
-        cs.insert_script(
-            m31_sub_gadget,
-            [self.variable, rhs.variable],
-            &Options::new(),
-        )
-        .unwrap();
+        cs.insert_script(rust_bitcoin_m31::m31_sub, [self.variable, rhs.variable])
+            .unwrap();
 
         let res_var = M31Var::new_variable(&cs, res, AllocationMode::FunctionOutput).unwrap();
         res_var
@@ -93,16 +85,12 @@ impl Mul for &M31Var {
     type Output = M31Var;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let res = mul_m31(self.value, rhs.value);
+        let res = self.value * rhs.value;
 
         let cs = self.cs.and(&rhs.cs);
 
-        cs.insert_script(
-            m31_mult_gadget,
-            [self.variable, rhs.variable],
-            &Options::new(),
-        )
-        .unwrap();
+        cs.insert_script(rust_bitcoin_m31::m31_mul, [self.variable, rhs.variable])
+            .unwrap();
 
         M31Var::new_function_output(&cs, res).unwrap()
     }
@@ -125,11 +113,11 @@ impl Neg for &M31Var {
     type Output = M31Var;
 
     fn neg(self) -> Self::Output {
-        let res = sub_m31(0, self.value);
+        let res = -self.value;
 
         let cs = self.cs();
 
-        cs.insert_script(m31_neg_gadget, [self.variable], &Options::new())
+        cs.insert_script(rust_bitcoin_m31::m31_neg, [self.variable])
             .unwrap();
 
         M31Var::new_function_output(&cs, res).unwrap()
@@ -138,16 +126,16 @@ impl Neg for &M31Var {
 
 impl M31Var {
     pub fn is_zero(&self) {
-        assert_eq!(self.value, 0);
+        assert_eq!(self.value.0, 0);
         self.cs
-            .insert_script(m31_is_zero_gadget, [self.variable], &Options::new())
+            .insert_script(m31_is_zero_gadget, [self.variable])
             .unwrap();
     }
 
     pub fn is_one(&self) {
-        assert_eq!(self.value, 1);
+        assert_eq!(self.value.0, 1);
         self.cs
-            .insert_script(m31_is_one_gadget, [self.variable], &Options::new())
+            .insert_script(m31_is_one_gadget, [self.variable])
             .unwrap();
     }
 
@@ -156,7 +144,7 @@ impl M31Var {
         let inv_limbs = self_limbs.inverse(&table);
 
         let cs = self.cs.and(&table.cs);
-        let inv = M31Var::new_hint(&cs, pow2147483645(self.value)).unwrap();
+        let inv = M31Var::new_hint(&cs, self.value.inverse()).unwrap();
 
         cs.insert_script(
             m31_to_limbs_gadget,
@@ -164,7 +152,6 @@ impl M31Var {
                 .iter()
                 .chain(inv_limbs.variables().iter())
                 .copied(),
-            &Options::new(),
         )
         .unwrap();
 
@@ -172,7 +159,7 @@ impl M31Var {
     }
 
     pub fn inverse_without_table(&self) -> Self {
-        let inv = M31Var::new_hint(&self.cs, pow2147483645(self.value)).unwrap();
+        let inv = M31Var::new_hint(&self.cs, self.value.inverse()).unwrap();
 
         let res = self * &inv;
         res.is_one();
@@ -181,32 +168,16 @@ impl M31Var {
     }
 }
 
-fn m31_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(rust_bitcoin_m31::m31_add())
-}
-
-fn m31_sub_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(rust_bitcoin_m31::m31_sub())
-}
-
-fn m31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(rust_bitcoin_m31::m31_mul())
-}
-
-fn m31_is_zero_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
+fn m31_is_zero_gadget() -> Script {
+    script! {
         0 OP_EQUALVERIFY
-    })
+    }
 }
 
-fn m31_is_one_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
+fn m31_is_one_gadget() -> Script {
+    script! {
         1 OP_EQUALVERIFY
-    })
-}
-
-fn m31_neg_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(rust_bitcoin_m31::m31_neg())
+    }
 }
 
 #[cfg(test)]
@@ -217,7 +188,7 @@ mod test {
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 

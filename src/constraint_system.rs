@@ -1,9 +1,10 @@
 use crate::bvar::{AllocationMode, BVar};
 use crate::options::Options;
+use crate::script_generator::ScriptGenerator;
 use crate::stack::Stack;
-use crate::treepp::pushable::{Builder, Pushable};
-use crate::treepp::Script;
 use anyhow::{Error, Result};
+use bitcoin_circle_stark::treepp::pushable::{Builder, Pushable};
+use bitcoin_circle_stark::treepp::Script;
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::cmp::PartialEq;
@@ -32,7 +33,7 @@ impl ConstraintSystemRef {
         self.0.borrow_mut().alloc(data, mode)
     }
 
-    pub fn insert_script(
+    pub fn insert_script_complex(
         &self,
         script_generator: fn(&mut Stack, &Options) -> Result<Script>,
         input_idxs: impl IntoIterator<Item = usize>,
@@ -40,7 +41,17 @@ impl ConstraintSystemRef {
     ) -> Result<()> {
         self.0
             .borrow_mut()
-            .insert_script(script_generator, input_idxs, options)
+            .insert_script_complex(script_generator, input_idxs, options)
+    }
+
+    pub fn insert_script(
+        &self,
+        script_generator: fn() -> Script,
+        input_idxs: impl IntoIterator<Item = usize>,
+    ) -> Result<()> {
+        self.0
+            .borrow_mut()
+            .insert_script(script_generator, input_idxs, &Options::new())
     }
 
     pub fn get_element(&self, idx: usize) -> Result<Element> {
@@ -87,11 +98,7 @@ impl Pushable for &Element {
 
 #[derive(Clone, Debug)]
 pub enum TraceEntry {
-    InsertScript(
-        fn(&mut Stack, &Options) -> Result<Script>,
-        Vec<usize>,
-        Options,
-    ),
+    InsertScript(ScriptGenerator, Vec<usize>, Options),
     DeclareConstant(usize),
     DeclareOutput(usize),
     RequestHint(usize),
@@ -206,6 +213,29 @@ impl ConstraintSystem {
 
     pub fn insert_script(
         &mut self,
+        script_generator: fn() -> Script,
+        input_idxs: impl IntoIterator<Item = usize>,
+        options: &Options,
+    ) -> Result<()> {
+        if self.finalized {
+            return Err(Error::msg("The constraint system has been finalized"));
+        }
+
+        if self.num_inputs.is_none() {
+            self.num_inputs = Some(self.memory_last_idx);
+        }
+
+        self.trace.push(TraceEntry::InsertScript(
+            ScriptGenerator::Simple(script_generator),
+            input_idxs.into_iter().collect(),
+            options.clone(),
+        ));
+
+        Ok(())
+    }
+
+    pub fn insert_script_complex(
+        &mut self,
         script_generator: fn(&mut Stack, &Options) -> Result<Script>,
         input_idxs: impl IntoIterator<Item = usize>,
         options: &Options,
@@ -219,7 +249,7 @@ impl ConstraintSystem {
         }
 
         self.trace.push(TraceEntry::InsertScript(
-            script_generator,
+            ScriptGenerator::Complex(script_generator),
             input_idxs.into_iter().collect(),
             options.clone(),
         ));

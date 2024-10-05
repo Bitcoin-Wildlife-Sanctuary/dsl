@@ -72,12 +72,12 @@ impl Mul<(&TableVar, &QM31LimbsVar)> for &QM31LimbsVar {
 mod test {
     use crate::builtins::qm31::QM31Var;
     use crate::builtins::qm31_limbs::QM31LimbsVar;
-    use crate::builtins::table::utils::{mul_qm31, rand_qm31};
+    use crate::builtins::table::utils::rand_qm31;
     use crate::builtins::table::TableVar;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
@@ -87,7 +87,7 @@ mod test {
 
         let a_val = rand_qm31(&mut prng);
         let b_val = rand_qm31(&mut prng);
-        let expected = mul_qm31(a_val, b_val);
+        let expected = a_val * b_val;
 
         let cs = ConstraintSystem::new_ref();
 

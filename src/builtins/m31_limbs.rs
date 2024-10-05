@@ -1,17 +1,18 @@
 use crate::builtins::m31::M31Var;
 use crate::builtins::table::m31::{M31Limbs, M31LimbsGadget, M31Mult, M31MultGadget};
 use crate::builtins::table::utils::{
-    check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, mul_m31, pow2147483645,
-    OP_256MUL,
+    check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, OP_256MUL,
 };
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
 use crate::options::Options;
 use crate::stack::Stack;
-use crate::treepp::*;
 use anyhow::Result;
+use bitcoin_circle_stark::treepp::*;
 use std::ops::{Add, Mul};
+use stwo_prover::core::fields::m31::M31;
+use stwo_prover::core::fields::FieldExpOps;
 
 pub struct M31LimbsVar {
     pub variables: [usize; 4],
@@ -60,7 +61,7 @@ impl AllocVar for M31LimbsVar {
 impl From<&M31Var> for M31LimbsVar {
     fn from(v: &M31Var) -> Self {
         let cs = v.cs();
-        let num = v.value().unwrap();
+        let num = v.value().unwrap().0;
 
         let limbs = [
             num & 0xff,
@@ -73,7 +74,6 @@ impl From<&M31Var> for M31LimbsVar {
         cs.insert_script(
             m31_to_limbs_gadget,
             v.variables().iter().chain(res.variables().iter()).copied(),
-            &Options::new(),
         )
         .unwrap();
         res
@@ -89,18 +89,15 @@ impl Mul<(&TableVar, &M31LimbsVar)> for &M31LimbsVar {
 
         let cs = self.cs().and(&table.cs()).and(&rhs.cs());
 
-        let res = mul_m31(
-            convert_m31_from_limbs(&self.value),
-            convert_m31_from_limbs(&rhs.value),
-        );
+        let res = convert_m31_from_limbs(&self.value) * convert_m31_from_limbs(&rhs.value);
 
         let c_limbs = M31Mult::compute_c_limbs_from_limbs(&self.value, &rhs.value).unwrap();
 
         let q = M31Mult::compute_q(&c_limbs).unwrap();
-        let q_var = M31Var::new_hint(&cs, q).unwrap();
+        let q_var = M31Var::new_hint(&cs, M31::from(q)).unwrap();
 
         let options = Options::new().with_u32("table_ref", table.variables[0] as u32);
-        cs.insert_script(
+        cs.insert_script_complex(
             m31_limbs_mul_gadget,
             self.variables()
                 .iter()
@@ -120,7 +117,7 @@ impl M31LimbsVar {
     pub fn inverse(&self, table: &TableVar) -> M31LimbsVar {
         let cs = self.cs();
 
-        let inv = pow2147483645(convert_m31_from_limbs(&self.value));
+        let inv = convert_m31_from_limbs(&self.value).inverse();
         let inv_limbs = convert_m31_to_limbs(inv);
 
         let inv_limbs_var = M31LimbsVar::new_hint(&cs, inv_limbs).unwrap();
@@ -140,9 +137,8 @@ impl Add<&M31LimbsVar> for &M31LimbsVar {
 
         let cs = self.cs().and(&rhs.cs());
         cs.insert_script(
-            m31_limbs_add_gadget,
+            M31LimbsGadget::add_limbs,
             self.variables().iter().chain(rhs.variables.iter()).copied(),
-            &Options::new(),
         )
         .unwrap();
 
@@ -154,9 +150,9 @@ impl Add<&M31LimbsVar> for &M31LimbsVar {
     }
 }
 
-pub(crate) fn m31_to_limbs_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+pub(crate) fn m31_to_limbs_gadget() -> Script {
     // input: m31_var, limb1..4
-    Ok(script! {
+    script! {
         check_limb_format
         OP_256MUL OP_SWAP
         check_limb_format OP_ADD
@@ -168,7 +164,7 @@ pub(crate) fn m31_to_limbs_gadget(_: &mut Stack, _: &Options) -> Result<Script> 
         check_limb_format OP_ADD
 
         OP_EQUALVERIFY
-    })
+    }
 }
 
 fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> {
@@ -183,21 +179,17 @@ fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> 
     })
 }
 
-fn m31_limbs_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(M31LimbsGadget::add_limbs())
-}
-
 #[cfg(test)]
 mod test {
     use crate::builtins::m31::M31Var;
     use crate::builtins::m31_limbs::M31LimbsVar;
     use crate::builtins::table::m31::M31Limbs;
-    use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31, rand_m31};
+    use crate::builtins::table::utils::{convert_m31_to_limbs, rand_m31};
     use crate::builtins::table::TableVar;
     use crate::bvar::{AllocVar, BVar};
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
-    use crate::treepp::*;
+    use bitcoin_circle_stark::treepp::*;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
@@ -261,7 +253,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { mul_m31(a_val, b_val) }
+                { a_val * b_val }
             },
         )
         .unwrap();

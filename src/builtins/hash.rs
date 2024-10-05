@@ -1,13 +1,14 @@
 use crate::builtins::qm31::QM31Var;
-use crate::bvar::{AllocVar, AllocationMode, BVar};
+use crate::builtins::str::StrVar;
+use crate::bvar::{dummy_script, AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
 use crate::options::Options;
 use crate::stack::Stack;
-use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::all::OP_CAT;
 use bitcoin::opcodes::Ordinary::OP_SHA256;
 use bitcoin::script::write_scriptint;
+use bitcoin_circle_stark::treepp::*;
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
 use std::ops::Add;
@@ -63,7 +64,7 @@ impl Add for &HashVar {
         Update::update(&mut sha256, &self.value);
         let hash = sha256.finalize().to_vec();
 
-        cs.insert_script(hash_combine, [rhs.variable, self.variable], &Options::new())
+        cs.insert_script(hash_combine, [rhs.variable, self.variable])
             .unwrap();
         HashVar::new_function_output(&cs, hash).unwrap()
     }
@@ -102,9 +103,18 @@ impl<T: BVar> From<&T> for HashVar {
 
         let len = variables.len() as u32;
         let options = Options::new().with_u32("len", len);
-        cs.insert_script(hash_many, variables, &options).unwrap();
+        cs.insert_script_complex(hash_many, variables, &options)
+            .unwrap();
 
         HashVar::new_function_output(&cs, cur_hash.unwrap()).unwrap()
+    }
+}
+
+impl From<&HashVar> for StrVar {
+    fn from(v: &HashVar) -> StrVar {
+        let cs = v.cs();
+        cs.insert_script(dummy_script, v.variables()).unwrap();
+        StrVar::new_function_output(&cs, v.value().unwrap()).unwrap()
     }
 }
 
@@ -118,11 +128,11 @@ fn hash_many(_: &mut Stack, options: &Options) -> Result<Script> {
     })
 }
 
-fn hash_combine(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(Script::from(vec![OP_CAT.to_u8(), OP_SHA256.to_u8()]))
+fn hash_combine() -> Script {
+    Script::from(vec![OP_CAT.to_u8(), OP_SHA256.to_u8()])
 }
 
-fn bitcoin_num_to_bytes(v: i64) -> Vec<u8> {
+pub(crate) fn bitcoin_num_to_bytes(v: i64) -> Vec<u8> {
     let mut buf = [0u8; 8];
     let l = write_scriptint(&mut buf, v);
     buf[0..l].to_vec()

@@ -1,9 +1,7 @@
 use crate::constraint_system::ConstraintSystemRef;
-use crate::options::Options;
-use crate::stack::Stack;
-use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::Ordinary::OP_EQUALVERIFY;
+use bitcoin_circle_stark::treepp::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -32,9 +30,8 @@ pub trait BVar {
 
         for (&self_var, &rhs_var) in self.variables().iter().zip(rhs.variables().iter()) {
             cs.insert_script(
-                single_elem_equalverify,
+                single_elem_equalverify as fn() -> Script,
                 [self_var, rhs_var],
-                &Options::new(),
             )?;
         }
 
@@ -75,15 +72,15 @@ pub trait AllocVar: BVar + Sized {
 
     fn clone(&self) -> Result<Self> {
         let cs = self.cs();
-        cs.insert_script(dummy_script, self.variables(), &Options::new())?;
+        cs.insert_script(dummy_script, self.variables())?;
         Self::new_function_output(&cs, self.value()?)
     }
 }
 
-fn dummy_script(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {})
+pub(crate) fn dummy_script() -> Script {
+    script! {}
 }
 
-fn single_elem_equalverify(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(Script::from(vec![OP_EQUALVERIFY.to_u8()]))
+fn single_elem_equalverify() -> Script {
+    Script::from(vec![OP_EQUALVERIFY.to_u8()])
 }
