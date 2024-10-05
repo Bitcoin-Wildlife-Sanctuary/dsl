@@ -85,7 +85,7 @@ impl<T: BVar> From<&T> for HashVar {
         let cs = v.cs();
 
         let mut cur_hash = Option::<Vec<u8>>::None;
-        for &variable in variables.iter() {
+        for &variable in variables.iter().rev() {
             let mut sha256 = Sha256::new();
             match cs.get_element(variable).unwrap() {
                 Element::Num(v) => {
