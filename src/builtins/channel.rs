@@ -254,11 +254,11 @@ fn draw_hints_to_str_vars(cs: &ConstraintSystemRef, hint: DrawHints) -> Result<V
 
 #[cfg(test)]
 mod test {
-    use bitcoin_circle_stark::channel::ChannelWithHint;
     use crate::builtins::hash::HashVar;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
+    use bitcoin_circle_stark::channel::ChannelWithHint;
     use bitcoin_circle_stark::treepp::*;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
@@ -328,6 +328,6 @@ mod test {
                 }
             },
         )
-            .unwrap();
+        .unwrap();
     }
 }

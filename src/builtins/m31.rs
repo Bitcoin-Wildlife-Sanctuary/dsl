@@ -2,13 +2,13 @@ use crate::builtins::m31_limbs::{m31_to_limbs_gadget, M31LimbsVar};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
+use crate::options::Options;
+use crate::stack::Stack;
 use anyhow::Result;
 use bitcoin_circle_stark::treepp::*;
 use std::ops::{Add, Mul, Neg, Sub};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
-use crate::options::Options;
-use crate::stack::Stack;
 
 #[derive(Debug)]
 pub struct M31Var {
@@ -171,7 +171,13 @@ impl M31Var {
 
     pub fn trim(&self, logn: usize) -> Self {
         let res = self.value.0 & ((1 << logn) - 1);
-        self.cs.insert_script_complex(m31_trim_gadget, vec![self.variable], &Options::new().with_u32("logn", logn as u32)).unwrap();
+        self.cs
+            .insert_script_complex(
+                m31_trim_gadget,
+                vec![self.variable],
+                &Options::new().with_u32("logn", logn as u32),
+            )
+            .unwrap();
         M31Var::new_function_output(&self.cs, M31::from_u32_unchecked(res)).unwrap()
     }
 }
