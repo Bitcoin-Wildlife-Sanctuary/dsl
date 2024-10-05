@@ -7,6 +7,8 @@ use bitcoin_circle_stark::treepp::*;
 use std::ops::{Add, Mul, Neg, Sub};
 use stwo_prover::core::fields::m31::M31;
 use stwo_prover::core::fields::FieldExpOps;
+use crate::options::Options;
+use crate::stack::Stack;
 
 #[derive(Debug)]
 pub struct M31Var {
@@ -166,6 +168,12 @@ impl M31Var {
 
         inv
     }
+
+    pub fn trim(&self, logn: usize) -> Self {
+        let res = self.value.0 & ((1 << logn) - 1);
+        self.cs.insert_script_complex(m31_trim_gadget, vec![self.variable], &Options::new().with_u32("logn", logn as u32)).unwrap();
+        M31Var::new_function_output(&self.cs, M31::from_u32_unchecked(res)).unwrap()
+    }
 }
 
 fn m31_is_zero_gadget() -> Script {
@@ -177,6 +185,27 @@ fn m31_is_zero_gadget() -> Script {
 fn m31_is_one_gadget() -> Script {
     script! {
         1 OP_EQUALVERIFY
+    }
+}
+
+fn m31_trim_gadget(_: &mut Stack, options: &Options) -> Result<Script> {
+    let logn = options.get_u32("logn")?;
+    if logn == 31 {
+        Ok(script! {})
+    } else {
+        Ok(script! {
+            OP_TOALTSTACK
+            { 1 << logn }
+            for _ in logn..(31 - 1) {
+                OP_DUP OP_DUP OP_ADD
+            }
+            OP_FROMALTSTACK
+            for _ in logn..31 {
+                OP_SWAP
+                OP_2DUP OP_GREATERTHANOREQUAL
+                OP_IF OP_SUB OP_ELSE OP_DROP OP_ENDIF
+            }
+        })
     }
 }
 

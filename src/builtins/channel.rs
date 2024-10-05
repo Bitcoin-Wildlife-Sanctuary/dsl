@@ -71,17 +71,8 @@ impl HashVar {
     }
 
     pub fn draw_felt(&mut self) -> QM31Var {
-        let mut channel = Sha256Channel::default();
-        channel.update_digest(Sha256Hash::from(self.value.clone()));
-        let (_, hint) = channel.draw_felt_and_hints();
-
-        let to_extract = self.draw_digest();
-
+        let m31 = self.draw_many_m31(4);
         let cs = self.cs();
-
-        let hints = draw_hints_to_str_vars(&cs, hint).unwrap();
-
-        let m31 = to_extract.unpack_multi_m31(4, &hints);
 
         // perform a move operation
         let qm31 = QM31Var {
@@ -112,6 +103,39 @@ impl HashVar {
         };
 
         qm31
+    }
+
+    pub fn draw_many_m31(&mut self, mut n: usize) -> Vec<M31Var> {
+        let mut all_m31 = vec![];
+
+        let cs = self.cs();
+
+        while n > 0 {
+            let m = core::cmp::min(n, 8);
+
+            let mut channel = Sha256Channel::default();
+            channel.update_digest(Sha256Hash::from(self.value.clone()));
+            let (_, hint) = channel.draw_m31_and_hints(m);
+
+            let to_extract = self.draw_digest();
+            let hints = draw_hints_to_str_vars(&cs, hint).unwrap();
+
+            all_m31.extend(to_extract.unpack_multi_m31(m, &hints));
+
+            n -= m;
+        }
+
+        all_m31
+    }
+
+    pub fn draw_numbers(&mut self, n: usize, logn: usize) -> Vec<M31Var> {
+        let mut m31 = self.draw_many_m31(n);
+
+        for elem in m31.iter_mut() {
+            *elem = elem.trim(logn);
+        }
+
+        m31
     }
 }
 
@@ -230,6 +254,7 @@ fn draw_hints_to_str_vars(cs: &ConstraintSystemRef, hint: DrawHints) -> Result<V
 
 #[cfg(test)]
 mod test {
+    use bitcoin_circle_stark::channel::ChannelWithHint;
     use crate::builtins::hash::HashVar;
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
@@ -269,5 +294,40 @@ mod test {
             },
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_draw_numbers() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        let mut init_state = [0u8; 32];
+        init_state.iter_mut().for_each(|v| *v = prng.gen());
+        let init_state = Sha256Hash::from(init_state.to_vec());
+
+        let mut channel = Sha256Channel::default();
+        channel.update_digest(init_state);
+
+        let (numbers, _) = channel.draw_queries_and_hints(8, 12);
+
+        let cs = ConstraintSystem::new_ref();
+
+        let mut channel_digest = HashVar::new_constant(&cs, init_state.as_ref().to_vec()).unwrap();
+        let res = channel_digest.draw_numbers(8, 12);
+
+        cs.set_program_output(&channel_digest).unwrap();
+        for elem in res.iter() {
+            cs.set_program_output(elem).unwrap();
+        }
+
+        test_program(
+            cs,
+            script! {
+                { channel.digest.as_ref().to_vec() }
+                for number in numbers {
+                    { number }
+                }
+            },
+        )
+            .unwrap();
     }
 }
