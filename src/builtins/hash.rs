@@ -9,6 +9,7 @@ use bitcoin::opcodes::all::OP_CAT;
 use bitcoin::opcodes::Ordinary::OP_SHA256;
 use bitcoin::script::write_scriptint;
 use bitcoin_circle_stark::treepp::*;
+use num_traits::Zero;
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
 use std::ops::Add;
@@ -83,6 +84,46 @@ impl<T: BVar> From<&T> for HashVar {
     fn from(v: &T) -> HashVar {
         let variables = v.variables();
         let cs = v.cs();
+
+        let mut cur_hash = Option::<Vec<u8>>::None;
+        for &variable in variables.iter().rev() {
+            let mut sha256 = Sha256::new();
+            match cs.get_element(variable).unwrap() {
+                Element::Num(v) => {
+                    Update::update(&mut sha256, &bitcoin_num_to_bytes(v as i64));
+                }
+                Element::Str(v) => {
+                    Update::update(&mut sha256, &v);
+                }
+            }
+            if let Some(cur_hash) = cur_hash {
+                Update::update(&mut sha256, &cur_hash);
+            }
+            cur_hash = Some(sha256.finalize().to_vec());
+        }
+
+        let len = variables.len() as u32;
+        let options = Options::new().with_u32("len", len);
+        cs.insert_script_complex(hash_many, variables, &options)
+            .unwrap();
+
+        HashVar::new_function_output(&cs, cur_hash.unwrap()).unwrap()
+    }
+}
+
+impl<T: BVar> From<&[T]> for HashVar {
+    fn from(values: &[T]) -> Self {
+        assert!(!values.len().is_zero());
+
+        let mut cs = values[0].cs();
+        for value in values.iter().skip(1) {
+            cs = cs.and(&value.cs());
+        }
+
+        let mut variables = vec![];
+        for value in values.iter() {
+            variables.extend(value.variables());
+        }
 
         let mut cur_hash = Option::<Vec<u8>>::None;
         for &variable in variables.iter().rev() {
