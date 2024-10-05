@@ -1,5 +1,5 @@
 use crate::builtins::m31_limbs::{m31_to_limbs_gadget, M31LimbsVar};
-use crate::builtins::table::utils::pow2147483645;
+use crate::builtins::table::utils::{add_m31, mul_m31, pow2147483645, sub_m31};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
@@ -53,7 +53,7 @@ impl Add for &M31Var {
     type Output = M31Var;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let res = (((self.value as i64) + (rhs.value as i64)) % ((1i64 << 31) - 1)) as u32;
+        let res = add_m31(self.value, rhs.value);
 
         let cs = self.cs.and(&rhs.cs);
 
@@ -73,8 +73,7 @@ impl Sub for &M31Var {
     type Output = M31Var;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let res = (((self.value as i64) + ((1i64 << 31) - 1) - (rhs.value as i64))
-            % ((1i64 << 31) - 1)) as u32;
+        let res = sub_m31(self.value, rhs.value);
 
         let cs = self.cs.and(&rhs.cs);
 
@@ -94,7 +93,7 @@ impl Mul for &M31Var {
     type Output = M31Var;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let res = (((self.value as i64) * (rhs.value as i64)) % ((1i64 << 31) - 1)) as u32;
+        let res = mul_m31(self.value, rhs.value);
 
         let cs = self.cs.and(&rhs.cs);
 
@@ -126,7 +125,7 @@ impl Neg for &M31Var {
     type Output = M31Var;
 
     fn neg(self) -> Self::Output {
-        let res = (((1i64 << 31) - 1 - self.value as i64) % ((1i64 << 31) - 1)) as u32;
+        let res = sub_m31(0, self.value);
 
         let cs = self.cs();
 
@@ -138,6 +137,13 @@ impl Neg for &M31Var {
 }
 
 impl M31Var {
+    pub fn is_zero(&self) {
+        assert_eq!(self.value, 0);
+        self.cs
+            .insert_script(m31_is_zero_gadget, [self.variable], &Options::new())
+            .unwrap();
+    }
+
     pub fn is_one(&self) {
         assert_eq!(self.value, 1);
         self.cs
@@ -185,6 +191,12 @@ fn m31_sub_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
 
 fn m31_mult_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     Ok(rust_bitcoin_m31::m31_mul())
+}
+
+fn m31_is_zero_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(script! {
+        0 OP_EQUALVERIFY
+    })
 }
 
 fn m31_is_one_gadget(_: &mut Stack, _: &Options) -> Result<Script> {

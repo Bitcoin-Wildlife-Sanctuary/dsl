@@ -1,7 +1,8 @@
 use crate::builtins::m31::M31Var;
 use crate::builtins::table::m31::{M31Limbs, M31LimbsGadget, M31Mult, M31MultGadget};
 use crate::builtins::table::utils::{
-    check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, pow2147483645, OP_256MUL,
+    check_limb_format, convert_m31_from_limbs, convert_m31_to_limbs, mul_m31, pow2147483645,
+    OP_256MUL,
 };
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
@@ -88,9 +89,10 @@ impl Mul<(&TableVar, &M31LimbsVar)> for &M31LimbsVar {
 
         let cs = self.cs().and(&table.cs()).and(&rhs.cs());
 
-        let res = ((convert_m31_from_limbs(&self.value) as i64
-            * convert_m31_from_limbs(&rhs.value) as i64)
-            % ((1i64 << 31) - 1)) as u32;
+        let res = mul_m31(
+            convert_m31_from_limbs(&self.value),
+            convert_m31_from_limbs(&rhs.value),
+        );
 
         let c_limbs = M31Mult::compute_c_limbs_from_limbs(&self.value, &rhs.value).unwrap();
 

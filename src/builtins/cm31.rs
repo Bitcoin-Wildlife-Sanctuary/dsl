@@ -1,6 +1,6 @@
 use crate::builtins::cm31_limbs::CM31LimbsVar;
 use crate::builtins::m31::M31Var;
-use crate::builtins::table::utils::mul_cm31;
+use crate::builtins::table::utils::{inverse_cm31, mul_cm31};
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::ConstraintSystemRef;
@@ -8,7 +8,7 @@ use crate::options::Options;
 use crate::stack::Stack;
 use crate::treepp::Script;
 use anyhow::Result;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul, Neg, Sub};
 
 pub struct CM31Var {
     pub imag: M31Var,
@@ -126,33 +126,57 @@ impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
     }
 }
 
+impl Neg for &CM31Var {
+    type Output = CM31Var;
+
+    fn neg(self) -> Self::Output {
+        let real = -&self.real;
+        let imag = -&self.imag;
+
+        CM31Var { imag, real }
+    }
+}
+
 impl CM31Var {
+    pub fn is_one(&self) {
+        assert_eq!(self.value().unwrap(), (1, 0));
+        self.real.is_one();
+        self.imag.is_zero();
+    }
+
+    pub fn is_zero(&self) {
+        assert_eq!(self.value().unwrap(), (0, 0));
+        self.real.is_zero();
+        self.imag.is_zero();
+    }
+
     pub fn inverse(&self, table: &TableVar) -> Self {
-        // 1 / (a + bi) = (a - bi) / (a^2 + b^2).
-        let real_squared = &self.real * (table, &self.real);
-        let imag_squared = &self.imag * (table, &self.imag);
-        let denom = &real_squared + &imag_squared;
+        let cs = self.cs();
+        let res = inverse_cm31(self.value().unwrap());
 
-        let denom_inverse = denom.inverse(table);
+        let res_var = CM31Var::new_hint(&cs, res).unwrap();
+        let expected_one = &res_var * (table, self);
+        expected_one.is_one();
 
-        let real = &self.real * (table, &denom_inverse);
-        let imag = &(-&self.imag) * (table, &denom_inverse);
-
-        Self { real, imag }
+        res_var
     }
 
     pub fn inverse_without_table(&self) -> Self {
-        // 1 / (a + bi) = (a - bi) / (a^2 + b^2).
-        let real_squared = &self.real * &self.real;
-        let imag_squared = &self.imag * &self.imag;
-        let denom = &real_squared + &imag_squared;
+        let cs = self.cs();
+        let res = inverse_cm31(self.value().unwrap());
 
-        let denom_inverse = denom.inverse_without_table();
+        let res_var = CM31Var::new_hint(&cs, res).unwrap();
+        let expected_one = &res_var * self;
+        expected_one.is_one();
 
-        let real = &self.real * &denom_inverse;
-        let imag = &(-&self.imag) * &denom_inverse;
+        res_var
+    }
 
-        Self { real, imag }
+    pub fn shift_by_i(&self) -> Self {
+        let imag = self.real.clone().unwrap();
+        let real = -&self.imag;
+
+        Self { imag, real }
     }
 }
 

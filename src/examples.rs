@@ -1,30 +1,31 @@
 #[cfg(test)]
 mod test {
     use crate::builtins::m31::M31Var;
+    use crate::builtins::table::utils::{mul_m31, rand_m31};
     use crate::bvar::AllocVar;
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
     use crate::treepp::*;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_m31_mult() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let mut a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let mut a_val = rand_m31(&mut prng);
 
         let cs = ConstraintSystem::new_ref();
 
         let mut a = M31Var::new_program_input(&cs, a_val).unwrap();
 
         for _ in 0..10 {
-            let b_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+            let b_val = rand_m31(&mut prng);
 
             let b = M31Var::new_constant(&cs, b_val).unwrap();
 
             let c = &a * &b;
-            let c_val = ((a_val as i64) * (b_val as i64) % ((1i64 << 31) - 1)) as u32;
+            let c_val = mul_m31(a_val, b_val);
             assert_eq!(c.value, c_val);
 
             a = c;

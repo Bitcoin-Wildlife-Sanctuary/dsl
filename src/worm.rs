@@ -138,21 +138,22 @@ impl WORMMemory {
 #[cfg(test)]
 mod test {
     use crate::builtins::m31::M31Var;
+    use crate::builtins::table::utils::rand_m31;
     use crate::bvar::{AllocVar, BVar};
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
     use crate::treepp::*;
     use crate::worm::WORMMemory;
     use bitcoin_script::script;
-    use rand::{Rng, SeedableRng};
+    use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_worm_memory() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
-        let b_val = prng.gen_range(0..((1i64 << 31) - 1)) as u32;
+        let a_val = rand_m31(&mut prng);
+        let b_val = rand_m31(&mut prng);
 
         let mut worm = WORMMemory::new();
 
