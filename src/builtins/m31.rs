@@ -7,8 +7,7 @@ use crate::options::Options;
 use crate::stack::Stack;
 use crate::treepp::*;
 use anyhow::Result;
-use bitcoin::opcodes::Ordinary::OP_EQUALVERIFY;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul, Neg, Sub};
 
 pub struct M31Var {
     pub variable: usize,
@@ -54,7 +53,7 @@ impl Add for &M31Var {
     type Output = M31Var;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let res = ((self.value as i64) + (rhs.value as i64) % ((1i64 << 31) - 1)) as u32;
+        let res = (((self.value as i64) + (rhs.value as i64)) % ((1i64 << 31) - 1)) as u32;
 
         let cs = self.cs.and(&rhs.cs);
 
@@ -74,8 +73,8 @@ impl Sub for &M31Var {
     type Output = M31Var;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let res = ((self.value as i64) + ((1i64 << 31) - 1)
-            - (rhs.value as i64) % ((1i64 << 31) - 1)) as u32;
+        let res = (((self.value as i64) + ((1i64 << 31) - 1) - (rhs.value as i64))
+            % ((1i64 << 31) - 1)) as u32;
 
         let cs = self.cs.and(&rhs.cs);
 
@@ -95,7 +94,7 @@ impl Mul for &M31Var {
     type Output = M31Var;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let res = ((self.value as i64) * (rhs.value as i64) % ((1i64 << 31) - 1)) as u32;
+        let res = (((self.value as i64) * (rhs.value as i64)) % ((1i64 << 31) - 1)) as u32;
 
         let cs = self.cs.and(&rhs.cs);
 
@@ -120,6 +119,21 @@ impl Mul<(&TableVar, &M31Var)> for &M31Var {
         let self_limbs = M31LimbsVar::from(self);
         let rhs_limbs = M31LimbsVar::from(rhs);
         &self_limbs * (table, &rhs_limbs)
+    }
+}
+
+impl Neg for &M31Var {
+    type Output = M31Var;
+
+    fn neg(self) -> Self::Output {
+        let res = (((1i64 << 31) - 1 - self.value as i64) % ((1i64 << 31) - 1)) as u32;
+
+        let cs = self.cs();
+
+        cs.insert_script(m31_neg_gadget, [self.variable], &Options::new())
+            .unwrap();
+
+        M31Var::new_function_output(&cs, res).unwrap()
     }
 }
 
@@ -159,17 +173,6 @@ impl M31Var {
 
         inv
     }
-
-    pub fn equalverify(&self, rhs: &Self) -> Result<()> {
-        assert_eq!(self.value, rhs.value);
-
-        let cs = self.cs.and(&rhs.cs());
-        cs.insert_script(
-            m31_equalverify_gadget,
-            [self.variable, rhs.variable],
-            &Options::new(),
-        )
-    }
 }
 
 fn m31_add_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
@@ -190,8 +193,8 @@ fn m31_is_one_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
     })
 }
 
-fn m31_equalverify_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(Script::from(vec![OP_EQUALVERIFY.to_u8()]))
+fn m31_neg_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
+    Ok(rust_bitcoin_m31::m31_neg())
 }
 
 #[cfg(test)]

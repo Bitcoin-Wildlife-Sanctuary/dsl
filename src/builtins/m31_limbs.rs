@@ -130,19 +130,6 @@ impl M31LimbsVar {
     }
 }
 
-impl M31LimbsVar {
-    pub fn equalverify(&self, rhs: &Self) -> Result<()> {
-        assert_eq!(self.value, rhs.value);
-
-        let cs = self.cs.and(&rhs.cs());
-        cs.insert_script(
-            m31_limbs_equalverify_gadget,
-            self.variables.iter().chain(rhs.variables.iter()).copied(),
-            &Options::new(),
-        )
-    }
-}
-
 impl Add<&M31LimbsVar> for &M31LimbsVar {
     type Output = M31LimbsVar;
 
@@ -182,15 +169,6 @@ pub(crate) fn m31_to_limbs_gadget(_: &mut Stack, _: &Options) -> Result<Script> 
     })
 }
 
-fn m31_limbs_equalverify_gadget(_: &mut Stack, _: &Options) -> Result<Script> {
-    Ok(script! {
-        4 OP_ROLL OP_EQUALVERIFY
-        3 OP_ROLL OP_EQUALVERIFY
-        OP_ROT OP_EQUALVERIFY
-        OP_EQUALVERIFY
-    })
-}
-
 fn m31_limbs_mul_gadget(stack: &mut Stack, options: &Options) -> Result<Script> {
     let last_table_elem = options.get_u32("table_ref")?;
     let k = stack.get_relative_position(last_table_elem as usize)? - 512;
@@ -214,7 +192,7 @@ mod test {
     use crate::builtins::table::m31::M31Limbs;
     use crate::builtins::table::utils::{convert_m31_to_limbs, mul_m31, rand_m31};
     use crate::builtins::table::TableVar;
-    use crate::bvar::AllocVar;
+    use crate::bvar::{AllocVar, BVar};
     use crate::constraint_system::ConstraintSystem;
     use crate::test_program;
     use crate::treepp::*;

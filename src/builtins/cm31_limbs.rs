@@ -46,15 +46,6 @@ impl From<&CM31Var> for CM31LimbsVar {
     }
 }
 
-impl CM31LimbsVar {
-    pub fn equalverify(&self, rhs: &Self) -> Result<()> {
-        assert_eq!(self.value()?, rhs.value()?);
-        self.real.equalverify(&rhs.real)?;
-        self.imag.equalverify(&rhs.imag)?;
-        Ok(())
-    }
-}
-
 impl Mul<(&TableVar, &CM31LimbsVar)> for &CM31LimbsVar {
     type Output = CM31Var;
 
