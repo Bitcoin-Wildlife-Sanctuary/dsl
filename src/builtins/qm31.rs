@@ -233,10 +233,11 @@ impl QM31Var {
     }
 
     pub fn shift_by_j(&self) -> QM31Var {
-        let first = self.second.copy().unwrap();
-        let mut second = &self.first + &self.first;
-        second.real = &second.real + &self.first.imag;
-        second.imag = &second.imag - &self.first.real;
+        let second = self.first.copy().unwrap();
+
+        let mut first = &self.second + &self.second;
+        first.real = &first.real - &self.second.imag;
+        first.imag = &first.imag + &self.second.real;
 
         QM31Var { first, second }
     }
