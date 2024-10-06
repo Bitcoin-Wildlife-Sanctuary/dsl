@@ -1,4 +1,5 @@
 use crate::builtins::cm31::CM31Var;
+use crate::builtins::cm31_limbs::CM31LimbsVar;
 use crate::builtins::m31::M31Var;
 use crate::builtins::m31_limbs::M31LimbsVar;
 use crate::builtins::qm31_limbs::QM31LimbsVar;
@@ -161,6 +162,26 @@ impl Mul<(&TableVar, &M31Var)> for &QM31Var {
                 imag: res_second_imag,
                 real: res_second_real,
             },
+        }
+    }
+}
+
+impl Mul<(&TableVar, &CM31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &CM31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let self_limbs = QM31LimbsVar::from(self);
+        let rhs_limbs = CM31LimbsVar::from(rhs);
+
+        let res_first = &self_limbs.first * (table, &rhs_limbs);
+        let res_second = &self_limbs.second * (table, &rhs_limbs);
+
+        QM31Var {
+            first: res_first,
+            second: res_second,
         }
     }
 }

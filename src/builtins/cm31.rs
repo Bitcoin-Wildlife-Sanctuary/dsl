@@ -1,5 +1,6 @@
 use crate::builtins::cm31_limbs::CM31LimbsVar;
 use crate::builtins::m31::M31Var;
+use crate::builtins::m31_limbs::M31LimbsVar;
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::ConstraintSystemRef;
@@ -7,7 +8,6 @@ use anyhow::Result;
 use std::ops::{Add, Mul, Neg, Sub};
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::FieldExpOps;
-use crate::builtins::m31_limbs::M31LimbsVar;
 
 #[derive(Clone)]
 pub struct CM31Var {
