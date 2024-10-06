@@ -40,6 +40,11 @@ impl Compiler {
             for i in 0..num_inputs {
                 input.push(cs.memory.get(&i).unwrap().clone())
             }
+        } else {
+            let num_inputs = cs.memory_last_idx;
+            for i in 0..num_inputs {
+                input.push(cs.memory.get(&i).unwrap().clone())
+            }
         }
 
         // step 3: initialize the stack
