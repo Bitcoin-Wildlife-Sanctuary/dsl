@@ -7,6 +7,7 @@ use anyhow::Result;
 use std::ops::{Add, Mul, Neg, Sub};
 use stwo_prover::core::fields::cm31::CM31;
 use stwo_prover::core::fields::FieldExpOps;
+use crate::builtins::m31_limbs::M31LimbsVar;
 
 #[derive(Clone)]
 pub struct CM31Var {
@@ -121,6 +122,23 @@ impl Mul<(&TableVar, &CM31Var)> for &CM31Var {
         let self_limbs = CM31LimbsVar::from(self);
         let rhs_limbs = CM31LimbsVar::from(rhs);
         &self_limbs * (table, &rhs_limbs)
+    }
+}
+
+impl Mul<(&TableVar, &M31Var)> for &CM31Var {
+    type Output = CM31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let self_limbs = CM31LimbsVar::from(self);
+        let rhs_limbs = M31LimbsVar::from(rhs);
+
+        let real = &self_limbs.real * (&table, &rhs_limbs);
+        let imag = &self_limbs.imag * (&table, &rhs_limbs);
+
+        CM31Var { real, imag }
     }
 }
 
