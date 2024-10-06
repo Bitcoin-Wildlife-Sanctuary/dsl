@@ -1,5 +1,6 @@
 use crate::builtins::cm31::CM31Var;
 use crate::builtins::m31::M31Var;
+use crate::builtins::m31_limbs::M31LimbsVar;
 use crate::builtins::qm31_limbs::QM31LimbsVar;
 use crate::builtins::table::TableVar;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
@@ -133,6 +134,34 @@ impl Mul<(&TableVar, &QM31Var)> for &QM31Var {
         let self_limbs = QM31LimbsVar::from(self);
         let rhs_limbs = QM31LimbsVar::from(rhs);
         &self_limbs * (table, &rhs_limbs)
+    }
+}
+
+impl Mul<(&TableVar, &M31Var)> for &QM31Var {
+    type Output = QM31Var;
+
+    fn mul(self, rhs: (&TableVar, &M31Var)) -> Self::Output {
+        let table = rhs.0;
+        let rhs = rhs.1;
+
+        let self_limbs = QM31LimbsVar::from(self);
+        let rhs_limbs = M31LimbsVar::from(rhs);
+
+        let res_first_real = &self_limbs.first.real * (&table, &rhs_limbs);
+        let res_first_imag = &self_limbs.first.imag * (&table, &rhs_limbs);
+        let res_second_real = &self_limbs.second.real * (&table, &rhs_limbs);
+        let res_second_imag = &self_limbs.second.imag * (&table, &rhs_limbs);
+
+        QM31Var {
+            first: CM31Var {
+                imag: res_first_imag,
+                real: res_first_real,
+            },
+            second: CM31Var {
+                imag: res_second_imag,
+                real: res_second_real,
+            },
+        }
     }
 }
 
