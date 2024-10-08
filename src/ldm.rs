@@ -6,7 +6,7 @@ use sha2::Digest;
 use std::collections::HashMap;
 
 #[derive(Default)]
-pub struct WORMMemory {
+pub struct LDM {
     pub name_to_id: HashMap<String, usize>,
     pub value_map: Vec<Vec<u8>>,
     pub hash_map: Vec<Vec<u8>>,
@@ -18,8 +18,8 @@ pub struct WORMMemory {
     pub read_log: Vec<usize>,
 }
 
-impl WORMMemory {
-    pub fn new() -> WORMMemory {
+impl LDM {
+    pub fn new() -> LDM {
         Self::default()
     }
 
@@ -141,24 +141,24 @@ mod test {
     use crate::builtins::table::utils::rand_m31;
     use crate::bvar::{AllocVar, BVar};
     use crate::constraint_system::ConstraintSystem;
+    use crate::ldm::LDM;
     use crate::test_program;
-    use crate::worm::WORMMemory;
     use bitcoin_circle_stark::treepp::*;
     use bitcoin_script::script;
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
     #[test]
-    fn test_worm_memory() {
+    fn test_ldm() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
         let a_val = rand_m31(&mut prng);
         let b_val = rand_m31(&mut prng);
 
-        let mut worm = WORMMemory::new();
+        let mut ldm = LDM::new();
 
         let cs = ConstraintSystem::new_ref();
-        worm.init(&cs).unwrap();
+        ldm.init(&cs).unwrap();
 
         let a = M31Var::new_constant(&cs, a_val).unwrap();
         let b = M31Var::new_constant(&cs, b_val).unwrap();
@@ -166,32 +166,32 @@ mod test {
         let c = &a * &b;
         let c_val = c.value().unwrap();
 
-        worm.write("c", &c).unwrap();
-        worm.save().unwrap();
+        ldm.write("c", &c).unwrap();
+        ldm.save().unwrap();
 
         test_program(
             cs,
             script! {
-                { worm.write_hash_var.as_ref().unwrap().value.clone() }
-                { worm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
 
         let cs = ConstraintSystem::new_ref();
-        worm.init(&cs).unwrap();
+        ldm.init(&cs).unwrap();
 
-        let c = worm.read::<M31Var>("c").unwrap();
+        let c = ldm.read::<M31Var>("c").unwrap();
         assert_eq!(c.value().unwrap(), c_val);
 
-        worm.check().unwrap();
-        worm.save().unwrap();
+        ldm.check().unwrap();
+        ldm.save().unwrap();
 
         test_program(
             cs,
             script! {
-                { worm.write_hash_var.as_ref().unwrap().value.clone() }
-                { worm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();

@@ -7,7 +7,7 @@ use bitcoin_scriptexec::{convert_to_witness, execute_script};
 
 pub mod builtins;
 
-pub mod worm;
+pub mod ldm;
 
 pub mod bvar;
 
