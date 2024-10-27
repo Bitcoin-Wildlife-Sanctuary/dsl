@@ -5,9 +5,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::opcodes::OP_TRUE;
 use bitcoin::{TapLeafHash, Transaction};
 use bitcoin_circle_stark::treepp::*;
-use bitcoin_scriptexec::{
-    convert_to_witness, Exec, ExecCtx, ExecuteInfo, FmtStack, Options, TxTemplate,
-};
+use bitcoin_scriptexec::{convert_to_witness, Exec, ExecCtx, FmtStack, Options, TxTemplate};
 
 pub mod builtins;
 
@@ -101,24 +99,14 @@ fn test_program_generic(
         }
     }
     let res = exec.result().unwrap();
-
-    let info = ExecuteInfo {
-        success: res.success,
-        error: res.error.clone(),
-        last_opcode: res.opcode,
-        final_stack: FmtStack(exec.stack().clone()),
-        remaining_script: exec.remaining_script().to_asm_string(),
-        stats: exec.stats().clone(),
-    };
-
     if !res.success {
-        println!("{:8}", info.final_stack);
-        println!("{:?}", info.error);
+        println!("{:8}", FmtStack(exec.stack().clone()));
+        println!("{:?}", res.error);
     }
 
-    println!("max stack size: {}", info.stats.max_nb_stack_items);
+    println!("max stack size: {}", exec.stats().max_nb_stack_items);
 
-    if info.success {
+    if res.success {
         Ok(())
     } else {
         Err(Error::msg("Script execution is not successful"))
