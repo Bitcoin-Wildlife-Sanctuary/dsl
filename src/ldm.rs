@@ -12,10 +12,8 @@ pub struct LDM {
     pub hash_map: Vec<Vec<u8>>,
 
     pub cs: Option<ConstraintSystemRef>,
-
-    pub write_hash_var: Option<HashVar>,
-    pub read_hash_var: Option<HashVar>,
-    pub read_log: Vec<usize>,
+    pub hash_var: Option<HashVar>,
+    pub log: Vec<usize>,
 }
 
 impl LDM {
@@ -25,24 +23,14 @@ impl LDM {
 
     pub fn init(&mut self, cs: &ConstraintSystemRef) -> Result<()> {
         if self.cs.is_some() {
-            let write_hash = self.write_hash_var.as_ref().unwrap().value.clone();
-            let read_hash = self.read_hash_var.as_ref().unwrap().value.clone();
-
+            let read_hash = self.hash_var.as_ref().unwrap().value.clone();
             self.cs = Some(cs.clone());
-
-            self.write_hash_var = Some(HashVar::new_program_input(&cs, write_hash)?);
-            self.read_hash_var = Some(HashVar::new_program_input(&cs, read_hash)?);
+            self.hash_var = Some(HashVar::new_program_input(&cs, read_hash)?);
         } else {
             self.cs = Some(cs.clone());
-
-            let default_write_hash = sha2::Sha256::digest(b"write_hash").to_vec();
-            let default_read_hash = sha2::Sha256::digest(b"read_hash").to_vec();
-
-            let write_hash_var = HashVar::new_constant(&cs, default_write_hash)?;
-            let read_hash_var = HashVar::new_constant(&cs, default_read_hash)?;
-
-            self.write_hash_var = Some(write_hash_var);
-            self.read_hash_var = Some(read_hash_var);
+            let default_hash = sha2::Sha256::digest(b"ldm").to_vec();
+            let hash_var = HashVar::new_constant(&cs, default_hash)?;
+            self.hash_var = Some(hash_var);
         }
 
         Ok(())
@@ -61,7 +49,9 @@ impl LDM {
 
         let hash_var = HashVar::from(value);
         self.hash_map.push(hash_var.value.clone());
-        self.write_hash_var = Some(self.write_hash_var.as_ref().unwrap() + &hash_var);
+
+        self.hash_var = Some(self.hash_var.as_ref().unwrap() + &hash_var);
+        self.log.push(idx);
 
         Ok(())
     }
@@ -72,8 +62,8 @@ impl LDM {
         let value: T::Value = bincode::deserialize(&self.value_map[idx])?;
         let v = T::new_hint(self.cs.as_ref().unwrap(), value)?;
 
-        self.read_hash_var = Some(self.read_hash_var.as_ref().unwrap() + &HashVar::from(&v));
-        self.read_log.push(idx);
+        self.hash_var = Some(self.hash_var.as_ref().unwrap() + &HashVar::from(&v));
+        self.log.push(idx);
 
         Ok(v)
     }
@@ -82,11 +72,7 @@ impl LDM {
         self.cs
             .as_ref()
             .unwrap()
-            .set_program_output(self.write_hash_var.as_ref().unwrap())?;
-        self.cs
-            .as_ref()
-            .unwrap()
-            .set_program_output(self.read_hash_var.as_ref().unwrap())?;
+            .set_program_output(self.hash_var.as_ref().unwrap())?;
         Ok(())
     }
 
@@ -95,41 +81,30 @@ impl LDM {
         let mut map = Vec::<HashVar>::new();
         let cs = self.cs.as_ref().unwrap();
 
-        let default_write_hash = sha2::Sha256::digest(b"write_hash").to_vec();
-        let default_read_hash = sha2::Sha256::digest(b"read_hash").to_vec();
+        let default_hash = sha2::Sha256::digest(b"ldm").to_vec();
+        let mut recomputed_hash_var = HashVar::new_constant(&cs, default_hash)?;
 
-        let mut recomputed_write_hash_var = HashVar::new_constant(&cs, default_write_hash)?;
-        let mut recomputed_read_hash_var = HashVar::new_constant(&cs, default_read_hash)?;
-
-        let mut read_log_iter = self.read_log.iter().peekable();
+        let mut log_iter = self.log.iter().peekable();
 
         while next_index_to_load < self.value_map.len() {
             // load the next value
             let new_hash_var = HashVar::new_hint(cs, self.hash_map[next_index_to_load].clone())?;
             next_index_to_load += 1;
-
-            // update the current recomputed_write_hash_var
-            recomputed_write_hash_var = &recomputed_write_hash_var + &new_hash_var;
-
             map.push(new_hash_var);
 
             // peek the next read_log element
-            let mut next_read = read_log_iter.peek();
-            while next_read.is_some() && **next_read.unwrap() < next_index_to_load {
-                let id = *read_log_iter.next().unwrap();
-                recomputed_read_hash_var = &recomputed_read_hash_var + &map[id];
-                next_read = read_log_iter.peek();
+            let mut next = log_iter.peek();
+            while next.is_some() && **next.unwrap() < next_index_to_load {
+                let id = *log_iter.next().unwrap();
+                recomputed_hash_var = &recomputed_hash_var + &map[id];
+                next = log_iter.peek();
             }
         }
 
-        self.write_hash_var
+        self.hash_var
             .as_ref()
             .unwrap()
-            .equalverify(&recomputed_write_hash_var)?;
-        self.read_hash_var
-            .as_ref()
-            .unwrap()
-            .equalverify(&recomputed_read_hash_var)?;
+            .equalverify(&recomputed_hash_var)?;
 
         Ok(())
     }
@@ -172,8 +147,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
@@ -190,8 +164,7 @@ mod test {
         test_program(
             cs,
             script! {
-                { ldm.write_hash_var.as_ref().unwrap().value.clone() }
-                { ldm.read_hash_var.as_ref().unwrap().value.clone() }
+                { ldm.hash_var.as_ref().unwrap().value.clone() }
             },
         )
         .unwrap();
