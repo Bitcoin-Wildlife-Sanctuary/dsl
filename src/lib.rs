@@ -1,9 +1,13 @@
 use crate::compiler::Compiler;
 use crate::constraint_system::ConstraintSystemRef;
 use anyhow::{Error, Result};
+use bitcoin::hashes::Hash;
 use bitcoin::opcodes::OP_TRUE;
+use bitcoin::{TapLeafHash, Transaction};
 use bitcoin_circle_stark::treepp::*;
-use bitcoin_scriptexec::{convert_to_witness, execute_script};
+use bitcoin_scriptexec::{
+    convert_to_witness, Exec, ExecCtx, ExecuteInfo, FmtStack, Options, TxTemplate,
+};
 
 pub mod builtins;
 
@@ -24,6 +28,18 @@ pub mod options;
 pub mod script_generator;
 
 pub fn test_program(cs: ConstraintSystemRef, expected_stack: Script) -> Result<()> {
+    test_program_generic(cs, expected_stack, true)
+}
+
+pub fn test_program_without_opcat(cs: ConstraintSystemRef, expected_stack: Script) -> Result<()> {
+    test_program_generic(cs, expected_stack, false)
+}
+
+fn test_program_generic(
+    cs: ConstraintSystemRef,
+    expected_stack: Script,
+    opcat: bool,
+) -> Result<()> {
     let program = Compiler::compile(cs)?;
 
     let mut script = script! {
@@ -55,11 +71,54 @@ pub fn test_program(cs: ConstraintSystemRef, expected_stack: Script) -> Result<(
 
     println!("script size: {}", script.len());
 
-    let exec_result = execute_script(script);
+    let mut options = Options::default();
+    if !opcat {
+        options.experimental.op_cat = false;
+    };
 
-    println!("max stack size: {}", exec_result.stats.max_nb_stack_items);
+    let mut exec = Exec::new(
+        ExecCtx::Tapscript,
+        options,
+        TxTemplate {
+            tx: Transaction {
+                version: bitcoin::transaction::Version::TWO,
+                lock_time: bitcoin::locktime::absolute::LockTime::ZERO,
+                input: vec![],
+                output: vec![],
+            },
+            prevouts: vec![],
+            input_idx: 0,
+            taproot_annex_scriptleaf: Some((TapLeafHash::all_zeros(), None)),
+        },
+        script,
+        vec![],
+    )
+    .expect("error creating exec");
 
-    if exec_result.success {
+    loop {
+        if exec.exec_next().is_err() {
+            break;
+        }
+    }
+    let res = exec.result().unwrap();
+
+    let info = ExecuteInfo {
+        success: res.success,
+        error: res.error.clone(),
+        last_opcode: res.opcode,
+        final_stack: FmtStack(exec.stack().clone()),
+        remaining_script: exec.remaining_script().to_asm_string(),
+        stats: exec.stats().clone(),
+    };
+
+    if !res.success {
+        println!("{:8}", info.final_stack);
+        println!("{:?}", info.error);
+    }
+
+    println!("max stack size: {}", info.stats.max_nb_stack_items);
+
+    if info.success {
         Ok(())
     } else {
         Err(Error::msg("Script execution is not successful"))
