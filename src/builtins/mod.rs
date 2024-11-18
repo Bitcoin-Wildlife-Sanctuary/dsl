@@ -15,3 +15,5 @@ pub mod str;
 pub mod table;
 
 pub mod utils;
+
+pub mod bool;
