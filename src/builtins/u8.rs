@@ -118,6 +118,7 @@ mod test {
         let b = U8Var::new_constant(&cs, 4).unwrap();
 
         let c = &a + &b;
+        c.check_format().unwrap();
         cs.set_program_output(&c).unwrap();
         test_program(cs, script! { 12 }).unwrap();
     }
@@ -129,6 +130,7 @@ mod test {
         let b = U8Var::new_constant(&cs, 3).unwrap();
 
         let c = &a - &b;
+        c.check_format().unwrap();
         cs.set_program_output(&c).unwrap();
         test_program(cs, script! { 5 }).unwrap();
     }
