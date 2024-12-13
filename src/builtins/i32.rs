@@ -1,6 +1,8 @@
 use crate::builtins::u8::U8Var;
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
+use crate::options::Options;
+use crate::stack::Stack;
 use anyhow::Result;
 use bitcoin_circle_stark::treepp::*;
 use std::ops::{Add, Sub};
@@ -131,12 +133,74 @@ impl I32Var {
     pub fn check_format(&self) -> Result<()> {
         self.cs.insert_script(i32_check_format, [self.variable])
     }
+
+    pub fn to_positive_limbs(&self, l: usize) -> Result<Vec<U8Var>> {
+        assert!(l <= 8);
+        assert!(self.value >= 0);
+
+        let mut value = self.value as u32;
+        let mut res = vec![];
+
+        let n = (32 + l - 1) / l;
+
+        for _ in 0..n {
+            res.push(value & ((1 << l) - 1));
+            value >>= l;
+        }
+
+        let cs = self.cs();
+        let mut res_vars = vec![];
+        for &v in res.iter() {
+            res_vars.push(U8Var::new_hint(&cs, v as u8)?);
+        }
+
+        let mut variables = vec![self.variable];
+        for res_var in res_vars.iter() {
+            variables.push(res_var.variable);
+        }
+
+        cs.insert_script_complex(
+            i32_to_positive_limbs_check,
+            variables,
+            &Options::new()
+                .with_u32("n", n as u32)
+                .with_u32("l", l as u32),
+        )?;
+
+        Ok(res_vars)
+    }
 }
 
 fn i32_check_format() -> Script {
     script! {
         OP_ABS OP_DROP
     }
+}
+
+fn i32_to_positive_limbs_check(_: &mut Stack, options: &Options) -> Result<Script> {
+    let n = options.get_u32("n")? as usize;
+    let l = options.get_u32("l")? as usize;
+
+    Ok(script! {
+        for i in 0..n {
+            OP_DUP 0 OP_GREATERTHANOREQUAL OP_VERIFY
+            OP_DUP { 1 << l } OP_LESSTHAN OP_VERIFY
+
+            if i != 0 {
+                OP_FROMALTSTACK
+                OP_ADD
+            }
+
+            if i != n - 1 {
+                for _ in 0..l {
+                    OP_DUP OP_ADD
+                }
+                OP_TOALTSTACK
+            }
+        }
+
+        OP_EQUALVERIFY
+    })
 }
 
 #[cfg(test)]
@@ -147,6 +211,9 @@ mod test {
     use crate::constraint_system::{ConstraintSystem, Element};
     use crate::test_program;
     use bitcoin_circle_stark::treepp::*;
+    use num_traits::abs;
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_add_i32() {
@@ -279,5 +346,41 @@ mod test {
             .unwrap();
         a.check_format().unwrap();
         test_program(cs, script! {}).unwrap();
+    }
+
+    #[test]
+    fn test_i32_to_positive_limbs() {
+        let mut prng = ChaCha20Rng::seed_from_u64(0);
+
+        for l in 1..=8 {
+            let cs = ConstraintSystem::new_ref();
+            let a: i32 = abs(prng.gen::<i32>());
+
+            let a_var = I32Var::new_constant(&cs, a).unwrap();
+
+            let res_var = a_var.to_positive_limbs(l).unwrap();
+
+            let mut expected = vec![];
+            let n = (32 + l - 1) / l;
+
+            let mut cur = a as u32;
+            for _ in 0..n {
+                expected.push(cur & ((1 << l) - 1));
+                cur >>= l;
+            }
+
+            assert_eq!(res_var.len(), n);
+            for i in 0..n {
+                cs.set_program_output(&res_var[i]).unwrap();
+            }
+
+            test_program(
+                cs,
+                script! {
+                    { expected }
+                },
+            )
+            .unwrap();
+        }
     }
 }
