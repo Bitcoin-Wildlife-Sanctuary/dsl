@@ -3,8 +3,8 @@ use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
 use crate::options::Options;
 use crate::stack::Stack;
+use crate::treepp::*;
 use anyhow::Result;
-use bitcoin_circle_stark::treepp::*;
 use std::ops::{Add, Sub};
 
 #[derive(Debug, Clone)]
@@ -210,7 +210,7 @@ mod test {
     use crate::bvar::{AllocVar, AllocationMode};
     use crate::constraint_system::{ConstraintSystem, Element};
     use crate::test_program;
-    use bitcoin_circle_stark::treepp::*;
+    use crate::treepp::*;
     use num_traits::abs;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;

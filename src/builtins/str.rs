@@ -2,9 +2,9 @@ use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
 use crate::options::Options;
 use crate::stack::Stack;
+use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::all::OP_CAT;
-use bitcoin_circle_stark::treepp::*;
 use std::ops::Add;
 
 #[derive(Clone)]

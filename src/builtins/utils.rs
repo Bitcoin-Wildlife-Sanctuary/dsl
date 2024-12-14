@@ -1,5 +1,5 @@
+use crate::treepp::*;
 use bitcoin::opcodes::all::OP_RETURN;
-use bitcoin_circle_stark::treepp::*;
 
 #[allow(unused)]
 pub(crate) fn return_script() -> Script {

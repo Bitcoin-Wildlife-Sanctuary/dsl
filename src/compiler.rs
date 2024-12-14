@@ -1,9 +1,9 @@
 use crate::constraint_system::{ConstraintSystemRef, Element, TraceEntry};
 use crate::stack::Stack;
+use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::Ordinary::{OP_1SUB, OP_2DROP, OP_DEPTH, OP_DROP, OP_FROMALTSTACK, OP_ROLL};
 use bitcoin::ScriptBuf;
-use bitcoin_circle_stark::treepp::*;
 
 pub struct CompiledProgram {
     pub input: Vec<Element>,

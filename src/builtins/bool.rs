@@ -1,7 +1,7 @@
 use crate::bvar::{AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
+use crate::treepp::*;
 use anyhow::Result;
-use bitcoin_circle_stark::treepp::*;
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 #[derive(Debug, Clone)]

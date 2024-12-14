@@ -1,7 +1,7 @@
 use crate::options::Options;
 use crate::stack::Stack;
+use crate::treepp::Script;
 use anyhow::Result;
-use bitcoin_circle_stark::treepp::Script;
 
 #[derive(Clone, Debug)]
 pub enum ScriptGenerator {

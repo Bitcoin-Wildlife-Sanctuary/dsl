@@ -1,10 +1,10 @@
 use crate::compiler::Compiler;
 use crate::constraint_system::ConstraintSystemRef;
+use crate::treepp::*;
 use anyhow::{Error, Result};
 use bitcoin::hashes::Hash;
 use bitcoin::opcodes::OP_TRUE;
 use bitcoin::{TapLeafHash, Transaction};
-use bitcoin_circle_stark::treepp::*;
 use bitcoin_scriptexec::{convert_to_witness, Exec, ExecCtx, FmtStack, Options, TxTemplate};
 
 pub mod builtins;
@@ -15,8 +15,6 @@ pub mod bvar;
 
 pub mod constraint_system;
 
-pub mod examples;
-
 pub mod stack;
 
 pub mod compiler;
@@ -24,6 +22,19 @@ pub mod compiler;
 pub mod options;
 
 pub mod script_generator;
+
+#[allow(missing_docs)]
+pub mod treepp {
+    pub use bitcoin_script::{define_pushable, script};
+
+    pub use bitcoin_scriptexec::{convert_to_witness, get_final_stack};
+
+    #[cfg(test)]
+    pub use bitcoin_scriptexec::{execute_script, execute_script_with_witness_unlimited_stack};
+
+    define_pushable!();
+    pub use bitcoin::ScriptBuf as Script;
+}
 
 pub fn test_program(cs: ConstraintSystemRef, expected_stack: Script) -> Result<()> {
     test_program_generic(cs, expected_stack, true)

@@ -112,33 +112,32 @@ impl LDM {
 
 #[cfg(test)]
 mod test {
-    use crate::builtins::m31::M31Var;
-    use crate::builtins::table::utils::rand_m31;
+    use crate::builtins::hash::HashVar;
     use crate::bvar::{AllocVar, BVar};
     use crate::constraint_system::ConstraintSystem;
     use crate::ldm::LDM;
     use crate::test_program;
-    use bitcoin_circle_stark::treepp::*;
+    use crate::treepp::*;
     use bitcoin_script::script;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
     #[test]
     fn test_ldm() {
         let mut prng = ChaCha20Rng::seed_from_u64(0);
 
-        let a_val = rand_m31(&mut prng);
-        let b_val = rand_m31(&mut prng);
+        let a_val: [u8; 32] = prng.gen();
+        let b_val: [u8; 32] = prng.gen();
 
         let mut ldm = LDM::new();
 
         let cs = ConstraintSystem::new_ref();
         ldm.init(&cs).unwrap();
 
-        let a = M31Var::new_constant(&cs, a_val).unwrap();
-        let b = M31Var::new_constant(&cs, b_val).unwrap();
+        let a = HashVar::new_constant(&cs, a_val.to_vec()).unwrap();
+        let b = HashVar::new_constant(&cs, b_val.to_vec()).unwrap();
 
-        let c = &a * &b;
+        let c = &a + &b;
         let c_val = c.value().unwrap();
 
         ldm.write("c", &c).unwrap();
@@ -155,7 +154,7 @@ mod test {
         let cs = ConstraintSystem::new_ref();
         ldm.init(&cs).unwrap();
 
-        let c = ldm.read::<M31Var>("c").unwrap();
+        let c = ldm.read::<HashVar>("c").unwrap();
         assert_eq!(c.value().unwrap(), c_val);
 
         ldm.check().unwrap();

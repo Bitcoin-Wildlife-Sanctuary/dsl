@@ -1,7 +1,7 @@
 use crate::constraint_system::ConstraintSystemRef;
+use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::Ordinary::OP_EQUALVERIFY;
-use bitcoin_circle_stark::treepp::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

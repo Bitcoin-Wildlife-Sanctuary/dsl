@@ -1,14 +1,13 @@
-use crate::builtins::qm31::QM31Var;
 use crate::builtins::str::StrVar;
 use crate::bvar::{dummy_script, AllocVar, AllocationMode, BVar};
 use crate::constraint_system::{ConstraintSystemRef, Element};
 use crate::options::Options;
 use crate::stack::Stack;
+use crate::treepp::*;
 use anyhow::Result;
 use bitcoin::opcodes::all::OP_CAT;
 use bitcoin::opcodes::Ordinary::OP_SHA256;
 use bitcoin::script::write_scriptint;
-use bitcoin_circle_stark::treepp::*;
 use num_traits::Zero;
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
@@ -69,15 +68,6 @@ impl Add for &HashVar {
         cs.insert_script(hash_combine, [rhs.variable, self.variable])
             .unwrap();
         HashVar::new_function_output(&cs, hash).unwrap()
-    }
-}
-
-impl Add<&QM31Var> for &HashVar {
-    type Output = HashVar;
-
-    fn add(self, rhs: &QM31Var) -> HashVar {
-        let felt_hash = HashVar::from(rhs);
-        self + &felt_hash
     }
 }
 
@@ -174,7 +164,7 @@ fn hash_combine() -> Script {
     Script::from(vec![OP_CAT.to_u8(), OP_SHA256.to_u8()])
 }
 
-pub(crate) fn bitcoin_num_to_bytes(v: i64) -> Vec<u8> {
+pub fn bitcoin_num_to_bytes(v: i64) -> Vec<u8> {
     let mut buf = [0u8; 8];
     let l = write_scriptint(&mut buf, v);
     buf[0..l].to_vec()
